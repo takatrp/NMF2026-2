@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NMF第2分科会 設計ツール（TKC本筋版）</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #d7e0ea;
+      --blue: #1d4ed8;
+      --blue-soft: #dbeafe;
+      --purple: #7c3aed;
+      --green: #15803d;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --shadow: 0 12px 30px rgba(15,23,42,.08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #ecf3ff 0, var(--bg) 220px);
+    }
+    .wrap {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      border-radius: 24px;
+      padding: 28px;
+      color: #fff;
+      background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 58%, #60a5fa 100%);
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.25;
+    }
+    .hero p {
+      margin: 0;
+      color: rgba(255,255,255,.94);
+      line-height: 1.75;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    button, input, select, textarea {
+      font: inherit;
+    }
+    button {
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    .btn-soft { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.22); }
+    .btn-main { background: #0f172a; color: #fff; }
+    .btn-ghost { background: #f8fafc; color: var(--text); border-color: var(--line); }
+    .btn-danger { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+    .layout {
+      display: grid;
+      grid-template-columns: 370px minmax(0, 1fr) 390px;
+      gap: 18px;
+      align-items: start;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .panel h2, .panel h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .stack { display: flex; flex-direction: column; gap: 18px; }
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .field textarea {
+      min-height: 78px;
+      resize: vertical;
+      line-height: 1.65;
+    }
+    .row2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #f8fbff;
+      padding: 12px;
+    }
+    .stat .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .stat .value {
+      font-size: 24px;
+      font-weight: 800;
+    }
+    .banner {
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-weight: 700;
+      line-height: 1.6;
+      margin: 10px 0 0;
+    }
+    .ok { background: #dcfce7; color: var(--green); }
+    .warn { background: #fef3c7; color: var(--amber); }
+    .bad { background: #fee2e2; color: var(--red); }
+    .pillrow {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--muted);
+    }
+    .timeline {
+      height: 16px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      margin: 14px 0 6px;
+    }
+    .timeblock { height: 100%; min-width: 2px; border-right: 1px solid rgba(255,255,255,.66); }
+    .agenda-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .agenda-list { display: flex; flex-direction: column; gap: 12px; }
+    .segment {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      background: #fff;
+    }
+    .segment.active {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px var(--blue-soft);
+    }
+    .seg-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .seg-title { font-size: 17px; font-weight: 800; margin-bottom: 5px; }
+    .seg-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--line);
+    }
+    .lead-f { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
+    .lead-a { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+    .lead-b { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .lead-all { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .pillar-1 { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .pillar-2 { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+    .pillar-3 { background: #f5f3ff; color: #7c3aed; border-color: #ddd6fe; }
+    .pillar-4 { background: #ecfeff; color: #0f766e; border-color: #a5f3fc; }
+    .pillar-5 { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+    .pillar-6 { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+    .seg-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 10px;
+    }
+    .mini {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fbfdff;
+      padding: 10px 12px;
+    }
+    .mini strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .cardlist { display: grid; gap: 10px; }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fbfdff;
+    }
+    .metric .bar {
+      height: 10px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .metric .fill {
+      height: 100%;
+      background: var(--blue);
+    }
+    .checklist {
+      display: grid;
+      gap: 10px;
+    }
+    .checkitem {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fff;
+    }
+    .checkitem .name { font-weight: 800; margin-bottom: 6px; }
+    .script-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fbfdff;
+    }
+    .script-card h4 { margin: 0 0 8px; font-size: 14px; }
+    .script-card ul {
+      margin: 0;
+      padding-left: 18px;
+      line-height: 1.7;
+    }
+    .empty {
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px dashed var(--line);
+      padding: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .footer-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+      margin-top: 14px;
+    }
+    @media (max-width: 1220px) {
+      .layout { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media print {
+      body { background: #fff; }
+      .toolbar, .editor-panel, .actions, .footer-note, .agenda-head .right-buttons { display: none !important; }
+      .layout { grid-template-columns: 1fr; }
+      .panel, .hero { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>NMF第2分科会 設計ツール（TKC本筋版）</h1>
+    <p>
+      「システム活用」を単なるFXクラウド操作説明に矮小化せず、
+      自計化の動機付け → 初期設定・初期指導 → 月次巡回監査・事前確認 → 業績管理（365日変動損益計算書） → 継続MAS → ラストワンマイル
+      という一本のストーリーで設計するためのツールです。
+    </p>
+    <div class="toolbar">
+      <button class="btn-soft" id="loadBalanced">TKC本筋テンプレート</button>
+      <button class="btn-soft" id="loadOperation">実装重視テンプレート</button>
+      <button class="btn-soft" id="loadFuture">未来接続強調テンプレート</button>
+      <button class="btn-soft" id="addSegment">区間追加</button>
+      <button class="btn-soft" id="autoSchedule">開始時刻を自動再計算</button>
+      <button class="btn-soft" id="exportJson">JSON書き出し</button>
+      <button class="btn-soft" id="importJson">JSON読込</button>
+      <button class="btn-soft" onclick="window.print()">印刷</button>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="stack editor-panel">
+      <section class="panel">
+        <h2>TKC本筋の設計原理</h2>
+        <div class="checklist">
+          <div class="checkitem"><div class="name">1. システム活用の定義を狭めない</div><div class="muted">入力・監査・業績までを一連の運用として扱う。操作説明だけで終わらせない。</div></div>
+          <div class="checkitem"><div class="name">2. 未来の話は土台の上に載せる</div><div class="muted">変動損益・継続MASを語る前に、初期設定・初期指導・事前確認を削らない。</div></div>
+          <div class="checkitem"><div class="name">3. 365日変動損益計算書は中核</div><div class="muted">制度PLから未来は見えにくい。経営者対話を起こす中核として位置付ける。</div></div>
+          <div class="checkitem"><div class="name">4. 継続MASは別物ではなく延長線</div><div class="muted">現状把握から予実管理・打ち手・着地見込みへ接続させる。</div></div>
+          <div class="checkitem"><div class="name">5. ラストワンマイルは差別化だが土台の後</div><div class="muted">AIやツールは追加価値。主役はTKCの思想と運用であり、順序を逆にしない。</div></div>
+        </div>
+        <div class="footer-note">
+          根拠は、アップロードいただいた評価メモの整理に基づいています。そこでは、2025横浜の第2分科会がすでに
+          「入力→監査→業績」の流れを扱っており、変動損益・継続MASを厚くするのは良いが、初期設定・初期指導・事前確認を削り過ぎると価値を落とす、という評価でした。
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>区間編集</h2>
+        <div id="editorEmpty" class="empty">中央の区間を選ぶと、ここで内容を編集できます。問いの順番と、講師A・講師Bの役割分担を先に明確にするのがコツです。</div>
+        <div id="editor" style="display:none;">
+          <div class="field"><label>区間タイトル</label><input id="f_title" type="text"></div>
+          <div class="row2">
+            <div class="field"><label>開始時刻（分）</label><input id="f_start" type="number" min="0" step="1"></div>
+            <div class="field"><label>所要時間（分）</label><input id="f_duration" type="number" min="1" step="1"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>主担当</label><select id="f_lead"></select></div>
+            <div class="field"><label>柱</label><select id="f_pillar"></select></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>区分</label><select id="f_type"></select></div>
+            <div class="field"><label>参加者成熟度</label><select id="f_level"></select></div>
+          </div>
+          <div class="field"><label>この区間の狙い</label><textarea id="f_goal"></textarea></div>
+          <div class="field"><label>ファシリテーターの問い</label><textarea id="f_prompt"></textarea></div>
+          <div class="field"><label>講師Aの答えるポイント</label><textarea id="f_a"></textarea></div>
+          <div class="field"><label>講師Bの答えるポイント</label><textarea id="f_b"></textarea></div>
+          <div class="field"><label>参加者に持ち帰ってほしいこと</label><textarea id="f_takeaway"></textarea></div>
+          <div class="field"><label>使用資料・画面・ツール</label><textarea id="f_materials"></textarea></div>
+          <div class="field"><label>採用候補スライド</label><textarea id="f_slides" style="min-height:140px;"></textarea></div>
+          <div class="actions">
+            <button class="btn-ghost" id="moveUp">上へ</button>
+            <button class="btn-ghost" id="moveDown">下へ</button>
+            <button class="btn-danger" id="deleteSegment">この区間を削除</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="panel">
+      <div class="agenda-head">
+        <div>
+          <h2 style="margin-bottom:6px;">120分構成</h2>
+          <div class="muted">「何を話すか」ではなく、「何を土台にし、どこで未来につなげるか」という順序で確認します。</div>
+        </div>
+        <div class="right-buttons" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-ghost" id="makeScript">進行台本を更新</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="label">合計時間</div><div class="value" id="totalMinutes">0</div></div>
+        <div class="stat"><div class="label">120分との差</div><div class="value" id="diffMinutes">0</div></div>
+        <div class="stat"><div class="label">区間数</div><div class="value" id="segmentCount">0</div></div>
+        <div class="stat"><div class="label">対話・質疑時間</div><div class="value" id="dialogueMinutes">0</div></div>
+      </div>
+      <div id="balanceBanner" class="banner ok">ちょうど120分です。</div>
+      <div class="timeline" id="timeline"></div>
+      <div class="pillrow">
+        <span class="pill">ファシリテーターが流れを作る</span>
+        <span class="pill">講師Aは理論・構造寄り</span>
+        <span class="pill">講師Bは現場・運用寄り</span>
+        <span class="pill">全員対話区間で統合する</span>
+      </div>
+
+      <div class="agenda-list" id="agendaList" style="margin-top:16px;"></div>
+    </main>
+
+    <aside class="stack">
+      <section class="panel">
+        <h3>TKC本筋チェック</h3>
+        <div id="tkcScoreBanner" class="banner ok">本筋に沿った構成です。</div>
+        <div class="cardlist" id="pillarChecks"></div>
+        <div class="footer-note">
+          このチェックは、順序・欠落・配分の3点を見ています。特に、変動損益・継続MASを厚くする場合でも、
+          初期設定・初期指導・事前確認が薄すぎると警告を出します。
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3>役割バランス</h3>
+        <div class="cardlist" id="leadMetrics"></div>
+      </section>
+
+      <section class="panel">
+        <h3>進行フェーズの見取り図</h3>
+        <div class="cardlist" id="phaseMetrics"></div>
+      </section>
+
+      <section class="panel">
+        <h3>採用候補スライド一覧</h3>
+        <div class="muted" style="margin-bottom:10px;">各区間に紐づけた候補スライドを一覧化します。まずはこの一覧を叩き台にして、実際に採用するものだけを残してください。</div>
+        <div class="cardlist" id="slideSummary"></div>
+      </section>
+
+      <section class="panel">
+        <h3>ファシリテーター進行台本</h3>
+        <div class="muted" style="margin-bottom:10px;">冒頭の一言、問いの投げ先、締めの一言まで自動生成します。</div>
+        <div class="cardlist" id="scriptOutput"></div>
+      </section>
+    </aside>
+  </div>
+
+  <input type="file" id="jsonInput" accept="application/json" style="display:none;">
+</div>
+
+<script>
+const TARGET = 120;
+const leads = [
+  { value: 'facilitator', label: 'ファシリテーター' },
+  { value: 'speakerA', label: '講師A' },
+  { value: 'speakerB', label: '講師B' },
+  { value: 'all', label: '全員対話' }
+];
+const pillars = [
+  { value: '1', label: '①自計化の動機付け' },
+  { value: '2', label: '②初期設定・初期指導' },
+  { value: '3', label: '③月次巡回監査・事前確認' },
+  { value: '4', label: '④業績管理（365日変動損益）' },
+  { value: '5', label: '⑤継続MAS・未来接続' },
+  { value: '6', label: '⑥ラストワンマイル・標準化' }
+];
+const types = [
+  { value: 'opening', label: '導入' },
+  { value: 'discussion', label: '対話' },
+  { value: 'case', label: '事例' },
+  { value: 'demo', label: 'デモ' },
+  { value: 'qa', label: 'Q&A' },
+  { value: 'summary', label: 'まとめ' },
+  { value: 'transition', label: 'つなぎ' }
+];
+const levels = [
+  { value: 'mixed', label: '混在' },
+  { value: 'beginner', label: '初級向け' },
+  { value: 'middle', label: '中級向け' },
+  { value: 'advanced', label: '上級向け' }
+];
+const pillarMeta = {
+  '1': { short: '動機付け', min: 5, ideal: [5, 12] },
+  '2': { short: '初期設定・初期指導', min: 15, ideal: [18, 28] },
+  '3': { short: '巡回監査・事前確認', min: 10, ideal: [12, 22] },
+  '4': { short: '業績管理', min: 15, ideal: [18, 28] },
+  '5': { short: '継続MAS', min: 10, ideal: [12, 22] },
+  '6': { short: 'ラストワンマイル', min: 0, ideal: [8, 18] }
+};
+const leadClass = { facilitator: 'lead-f', speakerA: 'lead-a', speakerB: 'lead-b', all: 'lead-all' };
+let state = { title: 'NMF第2分科会 設計', segments: [], selectedId: null };
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function labelOf(arr, v){ const hit = arr.find(x=>x.value===v); return hit ? hit.label : v; }
+function esc(str){ return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+function nl2br(str){ return esc(str).replace(/\n/g,'<br>'); }
+function seg(data={}){
+  return {
+    id: uid(),
+    title: data.title || '新しい区間',
+    start: data.start ?? 0,
+    duration: data.duration ?? 10,
+    lead: data.lead || 'facilitator',
+    pillar: data.pillar || '1',
+    type: data.type || 'discussion',
+    level: data.level || 'mixed',
+    goal: data.goal || '',
+    prompt: data.prompt || '',
+    speakerA: data.speakerA || '',
+    speakerB: data.speakerB || '',
+    takeaway: data.takeaway || '',
+    materials: data.materials || '',
+    slides: data.slides || ''
+  };
+}
+function autoSchedule(target = state.segments){
+  let cursor = 0;
+  target.forEach(s => { s.start = cursor; cursor += Number(s.duration || 0); });
+}
+function balancedTemplate(){
+  const arr = [
+    seg({ title:'オープニング：第2分科会の射程を定義する', start:0, duration:10, lead:'facilitator', pillar:'1', type:'opening', level:'mixed',
+      goal:'「システム活用＝単なる操作説明」ではなく、入力・監査・業績・未来計画までを含むという前提を共有する。',
+      prompt:'本日の「システム活用」とは、どこまでを指すのか。なぜそこまで広く捉える必要があるのか。',
+      speakerA:'横浜までの流れを踏まえ、入力→監査→業績までが一連であることを示す。',
+      speakerB:'現場ではどこでつまずきやすいか、導入の肌感を補足する。',
+      takeaway:'第2分科会のテーマを狭く理解しない。', materials:'冒頭スライド、全体マップ',
+      slides:'★ 20260403第6回レジュメ.pptx｜2枚目｜「適正な申告まで」対「保証・経営助言まで」の対比で、冒頭の問題設定を一発で置ける。\n○ 20251205福山センター セミナー.pptx｜15枚目｜四大業務と自計化必須の流れを、よりフォーマルに示せる。\n△ 20251205福山センター セミナー.pptx｜4枚目｜全体目次。全体の射程を見せたい場合のみ使用。' }),
+    seg({ title:'自計化の動機付けと初期設計の重要性', start:10, duration:18, lead:'speakerA', pillar:'2', type:'discussion', level:'mixed',
+      goal:'未来の話は土台の整備なしには成立しないことを腹落ちさせる。',
+      prompt:'なぜ、変動損益や継続MASの前に、初期設定や初期指導を押さえなければならないのでしょうか。',
+      speakerA:'勘定科目設計、課税区分、証憑保存、自動受信、仕訳辞書などの構造的重要性を語る。',
+      speakerB:'導入時に崩れやすい実務論点と、後で効いてくるポイントを語る。',
+      takeaway:'初期設定は雑務ではなく、経営助言の前提条件である。', materials:'初期設定論点、導入フロー',
+      slides:'★ 【修正版】20251027NM自動化セミナー.pptx｜4枚目｜抵抗理論。自計化が進まない理由を「惰性・労力・感情・心理的反発」で整理できる。\n★ 【修正版】20251027NM自動化セミナー.pptx｜10枚目｜適時性と予算編成の重要性。自計化の先に何があるかを数字で示せる。\n○ 20251205福山センター セミナー.pptx｜20枚目｜同趣旨の研究結果。より広い文脈で説明したいときの代替。' }),
+    seg({ title:'初期指導を「入力説明」で終わらせない', start:28, duration:14, lead:'speakerB', pillar:'2', type:'case', level:'mixed',
+      goal:'初期指導を受入体制・監査体制・業績管理体制づくりとして再定義する。',
+      prompt:'初期指導で本当に作るべきものは何でしょうか。単なる入力手順で終わらせると何が起きますか。',
+      speakerA:'思想・制度・標準化の観点から補足する。',
+      speakerB:'実際の顧問先とのやり取りや、現場の失敗例を踏まえて話す。',
+      takeaway:'初期指導は運用の地ならしである。', materials:'初期指導のチェックポイント',
+      slides:'★ 20251205福山センター セミナー.pptx｜38枚目｜「会計システムのゴールは正確な月次決算と業績管理体制の構築」と明示できる。\n○ 20251205福山センター セミナー.pptx｜34枚目｜顧問先情報を起点にしたシームレス連携。初期指導が運用設計であることを視覚化しやすい。\n○ 【修正版】20251027NM自動化セミナー.pptx｜8〜9枚目｜記帳代行から自計化・経営助言へのシフト事例。導入時の話として使いやすい。' }),
+    seg({ title:'月次巡回監査と事前確認で助言時間を生み出す', start:42, duration:16, lead:'speakerB', pillar:'3', type:'discussion', level:'mixed',
+      goal:'事前確認を時短ではなく、論点前倒しと助言時間創出として位置づける。',
+      prompt:'事前確認があると、巡回監査や経営者対話の質はどう変わるのでしょうか。',
+      speakerA:'数字の確からしさ・スピード・監査品質の観点で補足する。',
+      speakerB:'「確認のための確認」ではなく、対話余地を作る工程だと説明する。',
+      takeaway:'監査工程の整備は、助言の時間を増やす。', materials:'事前確認の画面、論点整理例',
+      slides:'★ 20251205福山センター セミナー.pptx｜32枚目｜巡回監査機能による事前確認が明示されており、この区間の本命。\n★ 20251205福山センター セミナー.pptx｜36枚目｜一気通貫と翌月巡回監査率が高い事務所の効果を示せる。\n○ 20251009姫路支部FXC機能実務活用研修.pptx｜16枚目｜証憑と仕訳がセット表示され確認が容易、という事例で現場感を補える。' }),
+    seg({ title:'365日変動損益計算書を経営者対話の中核に置く', start:58, duration:22, lead:'speakerA', pillar:'4', type:'demo', level:'mixed',
+      goal:'制度PLでは見えにくい未来を、変動損益計算書でどう見せるかを示す。',
+      prompt:'なぜ制度PLだけでは未来の会話につながりにくく、変動損益計算書が必要になるのでしょうか。',
+      speakerA:'限界利益率・固定費・逆算・予見可能性の観点で説明する。',
+      speakerB:'経営者がどう反応するか、どの表現なら伝わるかを補足する。',
+      takeaway:'業績管理の中心は、数字の並びではなく見方の転換である。', materials:'365日変動損益計算書、総括表、業績評価',
+      slides:'★ 20260403第6回レジュメ.pptx｜9〜10枚目｜制度PLではなぜ足りず、変動損益計算書だと意思決定しやすいのかを正面から語れる。\n★ 20260403第6回レジュメ.pptx｜11枚目｜変動損益計算書の理解の一助としての補助ツール紹介。話を柔らかくできる。\n○ 20251205福山センター セミナー.pptx｜49枚目｜「保証と経営助言」という大きなまとめに接続できる。' }),
+    seg({ title:'継続MASへどう橋を架けるか', start:80, duration:16, lead:'all', pillar:'5', type:'discussion', level:'mixed',
+      goal:'現在地の把握から、予実・着地見込み・打ち手へ自然につなげる。',
+      prompt:'変動損益計算書の理解が、継続MAS活用の近道になるのはなぜでしょうか。',
+      speakerA:'構造の連続性と予実管理の考え方を示す。',
+      speakerB:'経営者対話が未来志向に変わる実務感を語る。',
+      takeaway:'継続MASは別物ではなく、変動損益の延長線にある。', materials:'継続MAS画面、予実管理イメージ',
+      slides:'★ 20260403第6回レジュメ.pptx｜6〜8枚目｜継続MASと変動損益計算書の構造が同じであることを、そのまま説明できる中核スライド。\n○ 20260403第6回レジュメ.pptx｜12枚目｜継続MASのおすすめ資料案内。会場への持ち帰り導線になる。\n○ 【修正版】20251027NM自動化セミナー.pptx｜10枚目｜予算編成の重要性を補強する補助資料。' }),
+    seg({ title:'ラストワンマイル：所内標準化とAI・ツール活用', start:96, duration:12, lead:'all', pillar:'6', type:'case', level:'middle',
+      goal:'思想を現場で再現するための追加価値として、ラストワンマイルを位置付ける。',
+      prompt:'良い考え方があっても現場で再現されない。そのギャップをどう埋めていますか。',
+      speakerA:'教育・標準化・伝達の仕組みとしての意義を話す。',
+      speakerB:'実際の活用場面と使いどころ、限界を補足する。',
+      takeaway:'ラストワンマイルは主役ではなく、思想を届け切る仕組みである。', materials:'ツールポータル、個別ツール、AI活用例',
+      slides:'★ 20251205福山センター セミナー.pptx｜46枚目｜AIでツールを作り、関与先配布・黒字経営支援・業務品質底上げに使う趣旨がまとまっている。\n○ 20251009姫路支部FXC機能実務活用研修.pptx｜23〜24枚目｜AIは「非常に優秀なスタッフ」という位置付け。所内標準化の話につなぎやすい。\n△ 20251009姫路支部FXC機能実務活用研修.pptx｜25〜27枚目｜AI論点比較や利用上の注意。時間が余る場合のみ。' }),
+    seg({ title:'会場との対話・質疑応答', start:108, duration:8, lead:'all', pillar:'5', type:'qa', level:'mixed',
+      goal:'参加者ごとの着手点を明確にする。',
+      prompt:'自分の事務所に持ち帰るとしたら、どこから着手すべきでしょうか。',
+      speakerA:'導入順序の観点で答える。',
+      speakerB:'現場負荷や抵抗感への向き合い方を答える。',
+      takeaway:'各事務所の第一歩が見える。', materials:'なし',
+      slides:'★ 20260403第6回レジュメ.pptx｜14枚目｜グループディスカッションの問いがそのまま質疑の叩き台になる。\n○ 20251205福山センター セミナー.pptx｜47〜49枚目｜最後に問いを拾ってまとめへ戻すときの補助。' }),
+    seg({ title:'締め：TKCシステムを未来の意思決定につなぐ', start:116, duration:4, lead:'facilitator', pillar:'5', type:'summary', level:'mixed',
+      goal:'本日の一本の流れを再確認し、誤解なく着地させる。',
+      prompt:'今日の話を一言でいえば、私たちは何を顧問先に届ける仕事なのでしょうか。',
+      speakerA:'入力・監査・業績・計画の連続性を一言で締める。',
+      speakerB:'明日からの実務にどう落とすかを短く示す。',
+      takeaway:'第2分科会の本筋は、月次決算と経営助言が回るOSの提示にある。', materials:'締めスライド',
+      slides:'★ 20251205福山センター セミナー.pptx｜47〜49枚目｜DXを何のために進めるのか、最後に「保証・経営助言」へ着地させられる。\n○ 20260403第6回レジュメ.pptx｜3〜5枚目｜経営助言業務の意義に改めて戻る締め方も可能。' })
+  ];
+  return arr;
+}
+function operationTemplate(){
+  const arr = balancedTemplate();
+  arr[1].duration = 20; arr[2].duration = 18; arr[3].duration = 18; arr[4].duration = 20; arr[5].duration = 14; arr[6].duration = 10; arr[7].duration = 10; arr[8].duration = 10;
+  autoSchedule(arr); return arr;
+}
+function futureTemplate(){
+  const arr = balancedTemplate();
+  arr[1].duration = 15; arr[2].duration = 12; arr[3].duration = 13; arr[4].duration = 24; arr[5].duration = 20; arr[6].duration = 16; arr[7].duration = 12; arr[8].duration = 8;
+  autoSchedule(arr); return arr;
+}
+function totalMinutes(){ return state.segments.reduce((s,x)=>s+Number(x.duration||0),0); }
+function dialogueMinutes(){ return state.segments.filter(x=>['discussion','qa','case'].includes(x.type) || x.lead==='all').reduce((s,x)=>s+Number(x.duration||0),0); }
+function pillarTotals(){
+  const obj = { '1':0,'2':0,'3':0,'4':0,'5':0,'6':0 };
+  state.segments.forEach(x => obj[x.pillar] = (obj[x.pillar] || 0) + Number(x.duration || 0));
+  return obj;
+}
+function leadTotals(){
+  const obj = { facilitator:0, speakerA:0, speakerB:0, all:0 };
+  state.segments.forEach(x => obj[x.lead] += Number(x.duration || 0));
+  return obj;
+}
+function phaseTotals(){
+  const obj = { 導入:0, 土台:0, 中核:0, 未来:0, 参加者対話:0 };
+  state.segments.forEach(x => {
+    if (x.pillar === '1') obj['導入'] += x.duration;
+    else if (['2','3'].includes(x.pillar)) obj['土台'] += x.duration;
+    else if (x.pillar === '4') obj['中核'] += x.duration;
+    else if (['5','6'].includes(x.pillar)) obj['未来'] += x.duration;
+    if (x.type === 'qa' || x.lead === 'all' || x.type === 'discussion') obj['参加者対話'] += x.duration;
+  });
+  return obj;
+}
+function buildChecks(){
+  const totals = pillarTotals();
+  const seq = state.segments.map(s => Number(s.pillar));
+  let orderPenalty = 0;
+  for (let i=1;i<seq.length;i++) { if (seq[i] < seq[i-1] - 1) orderPenalty++; }
+  const checks = [];
+  Object.keys(pillarMeta).forEach(k => {
+    const meta = pillarMeta[k];
+    const mins = totals[k] || 0;
+    let status = 'ok';
+    let text = `${mins}分。`;
+    if (mins < meta.min) {
+      status = k === '6' ? 'warn' : 'bad';
+      text += k === '6' ? '無くても成立はしますが、神戸版の独自色は弱くなります。' : `本筋上は薄すぎます。最低でも${meta.min}分は確保したいところです。`;
+    } else if (mins < meta.ideal[0] || mins > meta.ideal[1]) {
+      status = 'warn';
+      text += `理想帯は${meta.ideal[0]}〜${meta.ideal[1]}分です。`;
+    } else {
+      text += '配分は概ね適切です。';
+    }
+    checks.push({ name: pillars.find(p=>p.value===k).label, status, text });
+  });
+
+  const future = (totals['5']||0) + (totals['6']||0);
+  const foundation = (totals['2']||0) + (totals['3']||0);
+  if (future > foundation + 10) {
+    checks.push({ name:'未来接続と土台のバランス', status:'bad', text:'継続MAS・ラストワンマイルが重く、初期設定・初期指導・事前確認が相対的に薄すぎます。未来の話が浮いて見える構成です。' });
+  } else if (future > foundation) {
+    checks.push({ name:'未来接続と土台のバランス', status:'warn', text:'未来寄りですが許容範囲です。土台の具体論が弱くならないか確認してください。' });
+  } else {
+    checks.push({ name:'未来接続と土台のバランス', status:'ok', text:'未来の話が土台の上に載っています。TKC本筋として自然です。' });
+  }
+  if (orderPenalty > 0) {
+    checks.push({ name:'順序の自然さ', status:'warn', text:'柱の順序に逆流があります。意図的でないなら、土台→業績→未来の順に並べ替えた方が伝わります。' });
+  } else {
+    checks.push({ name:'順序の自然さ', status:'ok', text:'土台から未来へ自然につながる順序です。' });
+  }
+  return checks;
+}
+function overallScore(checks){
+  let score = 100;
+  checks.forEach(c => { if (c.status === 'warn') score -= 8; if (c.status === 'bad') score -= 18; });
+  return Math.max(0, score);
+}
+function renderTop(){
+  const total = totalMinutes();
+  const diff = total - TARGET;
+  document.getElementById('totalMinutes').textContent = total;
+  document.getElementById('diffMinutes').textContent = diff > 0 ? `+${diff}` : `${diff}`;
+  document.getElementById('segmentCount').textContent = state.segments.length;
+  document.getElementById('dialogueMinutes').textContent = dialogueMinutes();
+  const banner = document.getElementById('balanceBanner');
+  if (diff === 0) { banner.className = 'banner ok'; banner.textContent = 'ちょうど120分です。'; }
+  else if (Math.abs(diff) <= 5) { banner.className = 'banner warn'; banner.textContent = diff < 0 ? `あと${Math.abs(diff)}分余裕があります。具体例や会場対話を足せます。` : `${diff}分オーバーです。台本化で圧縮可能ですが、削る場所を決める必要があります。`; }
+  else { banner.className = 'banner bad'; banner.textContent = diff < 0 ? `あと${Math.abs(diff)}分空いています。薄い区間を深掘りするか、質疑を増やしてください。` : `${diff}分オーバーです。構成の組み直しが必要です。`; }
+}
+function renderTimeline(){
+  const total = Math.max(TARGET, totalMinutes());
+  const colors = { '1':'#38bdf8','2':'#4f46e5','3':'#8b5cf6','4':'#14b8a6','5':'#22c55e','6':'#f97316' };
+  document.getElementById('timeline').innerHTML = state.segments.map(s => `<div class="timeblock" title="${esc(s.title)}" style="width:${(s.duration/total)*100}%; background:${colors[s.pillar]};"></div>`).join('');
+}
+function renderAgenda(){
+  const root = document.getElementById('agendaList');
+  root.innerHTML = '';
+  state.segments.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = `segment ${state.selectedId === s.id ? 'active' : ''}`;
+    div.innerHTML = `
+      <div class="seg-top">
+        <div>
+          <div class="seg-title">${i+1}. ${esc(s.title)}</div>
+          <div class="seg-meta">
+            <span>${s.start}〜${s.start + s.duration}分</span>
+            <span>${s.duration}分</span>
+            <span>${esc(labelOf(types, s.type))}</span>
+            <span>${esc(labelOf(levels, s.level))}</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+          <span class="tag ${leadClass[s.lead]}">${esc(labelOf(leads, s.lead))}</span>
+          <span class="tag pillar-${s.pillar}">${esc(labelOf(pillars, s.pillar))}</span>
+        </div>
+      </div>
+      <div class="seg-grid">
+        <div class="mini"><strong>ファシリテーターの問い</strong><div>${nl2br(s.prompt || '未設定')}</div></div>
+        <div class="mini"><strong>この区間の狙い / 持ち帰り</strong><div>${nl2br((s.goal||'未設定') + (s.takeaway ? '\n\n持ち帰り：' + s.takeaway : ''))}</div></div>
+        <div class="mini"><strong>講師A</strong><div>${nl2br(s.speakerA || '未設定')}</div></div>
+        <div class="mini"><strong>講師B</strong><div>${nl2br(s.speakerB || '未設定')}</div></div>
+        <div class="mini" style="grid-column:1 / -1;"><strong>採用候補スライド</strong><div>${nl2br(s.slides || '未設定')}</div></div>
+      </div>
+      <div class="actions">
+        <button class="btn-ghost select-btn" data-id="${s.id}">編集</button>
+        <button class="btn-ghost dup-btn" data-id="${s.id}">複製</button>
+      </div>`;
+    root.appendChild(div);
+  });
+  root.querySelectorAll('.select-btn').forEach(b => b.onclick = () => { state.selectedId = b.dataset.id; render(); });
+  root.querySelectorAll('.dup-btn').forEach(b => b.onclick = () => duplicate(b.dataset.id));
+}
+function renderChecks(){
+  const checks = buildChecks();
+  const score = overallScore(checks);
+  const banner = document.getElementById('tkcScoreBanner');
+  if (score >= 85) { banner.className = 'banner ok'; banner.textContent = `本筋に沿った構成です（適合度 ${score}点）。`; }
+  else if (score >= 65) { banner.className = 'banner warn'; banner.textContent = `方向性は良いですが、何点か補強が必要です（適合度 ${score}点）。`; }
+  else { banner.className = 'banner bad'; banner.textContent = `このままだと本筋がぶれます。構成の再調整が必要です（適合度 ${score}点）。`; }
+  document.getElementById('pillarChecks').innerHTML = checks.map(c => `<div class="checkitem"><div class="name">${esc(c.name)}</div><div class="banner ${c.status === 'ok' ? 'ok' : c.status === 'warn' ? 'warn' : 'bad'}" style="margin:0;">${esc(c.text)}</div></div>`).join('');
+}
+function renderMetrics(){
+  const leadsTotal = leadTotals();
+  document.getElementById('leadMetrics').innerHTML = leads.map(l => {
+    const v = leadsTotal[l.value] || 0;
+    return `<div class="metric"><div style="display:flex;justify-content:space-between;gap:8px;"><strong>${esc(l.label)}</strong><span>${v}分</span></div><div class="bar"><div class="fill" style="width:${Math.min(100, v/TARGET*100)}%;"></div></div></div>`;
+  }).join('');
+  const phases = phaseTotals();
+  document.getElementById('phaseMetrics').innerHTML = Object.entries(phases).map(([k,v]) => `<div class="metric"><div style="display:flex;justify-content:space-between;gap:8px;"><strong>${esc(k)}</strong><span>${v}分</span></div><div class="bar"><div class="fill" style="width:${Math.min(100, v/TARGET*100)}%;"></div></div></div>`).join('');
+}
+
+function renderSlideSummary(){
+  const root = document.getElementById('slideSummary');
+  root.innerHTML = state.segments.map(s => {
+    const body = s.slides ? nl2br(s.slides) : '未設定';
+    return `<div class="metric"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><strong>${esc(s.title)}</strong><span class="small muted">${s.start}〜${s.start + s.duration}分</span></div><div style="margin-top:8px; line-height:1.7;">${body}</div></div>`;
+  }).join('');
+}
+function buildScriptLines(s){
+  const open = `それでは次に「${s.title}」に移ります。`;
+  const reason = s.goal ? `この区間の狙いは、${s.goal}` : '';
+  const ask = s.prompt ? `問いとしては「${s.prompt}」です。` : '';
+  let direct = 'まず私から論点を整理します。';
+  if (s.lead === 'speakerA') direct = 'まず講師Aから、構造・考え方の面をお願いします。';
+  if (s.lead === 'speakerB') direct = 'まず講師Bから、現場・運用の面をお願いします。';
+  if (s.lead === 'all') direct = 'ここはお二人に掛け合いで進めていただきます。';
+  const close = s.takeaway ? `ここで参加者に持ち帰ってほしいのは「${s.takeaway}」です。` : '';
+  return [open, reason, ask, direct, close].filter(Boolean);
+}
+function renderScript(){
+  document.getElementById('scriptOutput').innerHTML = state.segments.map(s => `<div class="script-card"><h4>${s.start}〜${s.start + s.duration}分｜${esc(s.title)}</h4><ul>${buildScriptLines(s).map(line => `<li>${esc(line)}</li>`).join('')}</ul></div>`).join('');
+}
+function populateSelect(el, arr){ el.innerHTML = arr.map(x => `<option value="${x.value}">${x.label}</option>`).join(''); }
+function renderEditor(){
+  const target = state.segments.find(x => x.id === state.selectedId);
+  const empty = document.getElementById('editorEmpty');
+  const editor = document.getElementById('editor');
+  if (!target) { empty.style.display='block'; editor.style.display='none'; return; }
+  empty.style.display='none'; editor.style.display='block';
+  document.getElementById('f_title').value = target.title;
+  document.getElementById('f_start').value = target.start;
+  document.getElementById('f_duration').value = target.duration;
+  document.getElementById('f_lead').value = target.lead;
+  document.getElementById('f_pillar').value = target.pillar;
+  document.getElementById('f_type').value = target.type;
+  document.getElementById('f_level').value = target.level;
+  document.getElementById('f_goal').value = target.goal;
+  document.getElementById('f_prompt').value = target.prompt;
+  document.getElementById('f_a').value = target.speakerA;
+  document.getElementById('f_b').value = target.speakerB;
+  document.getElementById('f_takeaway').value = target.takeaway;
+  document.getElementById('f_materials').value = target.materials;
+  document.getElementById('f_slides').value = target.slides;
+}
+function updateField(key, value){
+  const target = state.segments.find(x => x.id === state.selectedId); if (!target) return;
+  target[key] = ['start','duration'].includes(key) ? Number(value) : value;
+  render();
+}
+function duplicate(id){
+  const i = state.segments.findIndex(x => x.id === id); if (i < 0) return;
+  const copy = seg({ ...state.segments[i], title: state.segments[i].title + '（複製）' });
+  state.segments.splice(i+1, 0, copy);
+  autoSchedule();
+  state.selectedId = copy.id;
+  render();
+}
+function addSegment(){
+  const s = seg({ start: totalMinutes(), duration: 10, title:'追加区間', prompt:'ここで何を問い、何を答えてもらうかを設定してください。' });
+  state.segments.push(s); state.selectedId = s.id; render();
+}
+function moveSelected(delta){
+  const i = state.segments.findIndex(x => x.id === state.selectedId); const j = i + delta;
+  if (i < 0 || j < 0 || j >= state.segments.length) return;
+  [state.segments[i], state.segments[j]] = [state.segments[j], state.segments[i]];
+  autoSchedule(); render();
+}
+function deleteSelected(){
+  const i = state.segments.findIndex(x => x.id === state.selectedId); if (i < 0) return;
+  state.segments.splice(i,1); state.selectedId = state.segments[i]?.id || state.segments[i-1]?.id || null; autoSchedule(); render();
+}
+function exportJson(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = 'nmf-session-plan-tkc-core.json'; a.click(); URL.revokeObjectURL(url);
+}
+function importJson(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const parsed = JSON.parse(r.result);
+      state = { title: parsed.title || state.title, segments: (parsed.segments || []).map(s => seg(s)), selectedId: null };
+      state.selectedId = state.segments[0]?.id || null;
+      render();
+    } catch(e){ alert('JSONの読込に失敗しました。'); }
+  };
+  r.readAsText(file, 'utf-8');
+}
+function render(){
+  if (!state.selectedId && state.segments[0]) state.selectedId = state.segments[0].id;
+  renderTop(); renderTimeline(); renderAgenda(); renderChecks(); renderMetrics(); renderSlideSummary(); renderScript(); renderEditor();
+}
+
+populateSelect(document.getElementById('f_lead'), leads);
+populateSelect(document.getElementById('f_pillar'), pillars);
+populateSelect(document.getElementById('f_type'), types);
+populateSelect(document.getElementById('f_level'), levels);
+[['f_title','title'],['f_start','start'],['f_duration','duration'],['f_lead','lead'],['f_pillar','pillar'],['f_type','type'],['f_level','level'],['f_goal','goal'],['f_prompt','prompt'],['f_a','speakerA'],['f_b','speakerB'],['f_takeaway','takeaway'],['f_materials','materials'],['f_slides','slides']].forEach(([id,key])=>{
+  document.getElementById(id).addEventListener('input', e => updateField(key, e.target.value));
+});
+document.getElementById('loadBalanced').onclick = () => { state.segments = balancedTemplate(); state.selectedId = state.segments[0].id; render(); };
+document.getElementById('loadOperation').onclick = () => { state.segments = operationTemplate(); state.selectedId = state.segments[0].id; render(); };
+document.getElementById('loadFuture').onclick = () => { state.segments = futureTemplate(); state.selectedId = state.segments[0].id; render(); };
+document.getElementById('addSegment').onclick = addSegment;
+document.getElementById('autoSchedule').onclick = () => { autoSchedule(); render(); };
+document.getElementById('moveUp').onclick = () => moveSelected(-1);
+document.getElementById('moveDown').onclick = () => moveSelected(1);
+document.getElementById('deleteSegment').onclick = deleteSelected;
+document.getElementById('makeScript').onclick = renderScript;
+document.getElementById('exportJson').onclick = exportJson;
+document.getElementById('importJson').onclick = () => document.getElementById('jsonInput').click();
+document.getElementById('jsonInput').addEventListener('change', e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; });
+state.segments = balancedTemplate();
+state.selectedId = state.segments[0].id;
+render();
+</script>
+</body>
+</html>
