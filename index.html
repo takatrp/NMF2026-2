@@ -203,8 +203,8 @@
         </div>
         <div class="field"><label>狙い</label><textarea id="e_goal"></textarea></div>
         <div class="field"><label>ファシリテーターの問い</label><textarea id="e_prompt"></textarea></div>
-        <div class="field"><label>講師Aの押さえどころ</label><textarea id="e_a"></textarea></div>
-        <div class="field"><label>講師Bの押さえどころ</label><textarea id="e_b"></textarea></div>
+        <div class="field"><label>松本の押さえどころ</label><textarea id="e_a"></textarea></div>
+        <div class="field"><label>大森の押さえどころ</label><textarea id="e_b"></textarea></div>
         <div class="field"><label>持ち帰り</label><textarea id="e_takeaway"></textarea></div>
         <div class="field"><label>採用候補スライド説明</label><textarea id="e_slides"></textarea></div>
         <div class="field"><label>サムネイルキー（カンマ区切り）</label><input id="e_thumbs" placeholder="例：r6_2,nm4,f20"></div>
@@ -306,8 +306,8 @@ const thumbnailAssets = {"r6_2": {"src": "data:image/jpeg;base64,/9j/4AAQSkZJRgA
 
 const leads = [
   {value:'facilitator', label:'ファシリテーター'},
-  {value:'speakerA', label:'講師A'},
-  {value:'speakerB', label:'講師B'},
+  {value:'speakerA', label:'松本'},
+  {value:'speakerB', label:'大森'},
   {value:'all', label:'全員対話'}
 ];
 const pillars = [
@@ -541,8 +541,8 @@ function renderAgenda(){
       <div class="seg-grid">
         <div class="mini"><strong>狙い</strong>${nl2br(s.goal)}</div>
         <div class="mini"><strong>ファシリテーターの問い</strong>${nl2br(s.prompt)}</div>
-        <div class="mini"><strong>講師A</strong>${nl2br(s.speakerA)}</div>
-        <div class="mini"><strong>講師B</strong>${nl2br(s.speakerB)}</div>
+        <div class="mini"><strong>松本</strong>${nl2br(s.speakerA)}</div>
+        <div class="mini"><strong>大森</strong>${nl2br(s.speakerB)}</div>
         <div class="mini" style="grid-column:1/-1"><strong>採用候補スライド</strong>${nl2br(s.slides)}${renderThumbs(s.thumbs)}</div>
       </div>
       <div class="actions">
@@ -578,8 +578,8 @@ function buildScriptText(){
     `主担当：${labelOf(leads,s.lead)}　柱：${labelOf(pillars,s.pillar)}`,
     `狙い：${s.goal}`,
     `ファシリテーターの問い：${s.prompt}`,
-    `講師Aの押さえどころ：${s.speakerA}`,
-    `講師Bの押さえどころ：${s.speakerB}`,
+    `松本の押さえどころ：${s.speakerA}`,
+    `大森の押さえどころ：${s.speakerB}`,
     `持ち帰り：${s.takeaway}`,
     `候補スライド：\n${s.slides}`
   ].join('\n')).join('\n\n'+'='.repeat(48)+'\n\n');
