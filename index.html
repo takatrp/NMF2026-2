@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NMF第2分科会 135分設計ツール v5.7</title>
+<title>NMF第2分科会 135分内休憩10分設計ツール v5.8</title>
 <style>
   :root {
     --bg:#f4f7fb;
@@ -96,7 +96,7 @@
   }
   textarea{min-height:66px;resize:vertical;line-height:1.55}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .stats{display:grid;grid-template-columns:repeat(4,minmax(88px,1fr));gap:6px;margin:0}
+  .stats{display:grid;grid-template-columns:repeat(5,minmax(74px,1fr));gap:6px;margin:0}
   .stat{background:#f8fbff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:46px}
   .stat .label{font-size:10px;color:var(--muted);margin-bottom:2px}
   .stat .value{font-size:18px;font-weight:900;line-height:1.15}
@@ -124,6 +124,9 @@
   .pillar-4{background:#ccfbf1;color:#0f766e;border-color:#99f6e4}
   .pillar-5{background:#dcfce7;color:#166534;border-color:#bbf7d0}
   .pillar-6{background:#ffedd5;color:#9a3412;border-color:#fed7aa}
+  .pillar-break{background:#e5e7eb;color:#334155;border-color:#cbd5e1}
+  .segment.break{background:#f8fafc;border-style:dashed}
+  .break-note{min-height:120px;display:flex;flex-direction:column;justify-content:center}
   .seg-grid{display:grid;grid-template-columns:1fr;gap:10px}
   .mini{background:#fbfdff;border:1px solid var(--line);border-radius:14px;padding:10px;line-height:1.6;font-size:13px}
   .section-list .mini{max-height:118px;overflow:auto}
@@ -202,7 +205,7 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>NMF第2分科会 135分設計ツール v5.7</h1>
+    <h1>NMF第2分科会 135分内休憩10分設計ツール v5.8</h1>
     <p>ファシリテーター（天野先生）、講師2名（大森先生・松本）の対話型進行を、TKC方式の本筋から外さず、時間配分・候補スライド・ガントチャート・台本・準拠度まで一体で設計します。</p>
     <div class="toolbar">
       <button class="btn-hero" data-template="balanced">TKC本筋テンプレート</button>
@@ -212,6 +215,7 @@
       <button class="btn-hero" id="autoBtn">開始時刻を再計算</button>
       <button class="btn-hero" id="exportBtn">JSON保存</button>
       <button class="btn-hero" id="importBtn">JSON読込</button>
+      <button class="btn-hero" id="shareLinkBtn">共有リンクコピー</button>
       <button class="btn-hero" onclick="window.print()">印刷</button>
     </div>
   </section>
@@ -265,9 +269,10 @@
 
       <div class="overview-status">
         <div class="stats">
-          <div class="stat"><div class="label">合計時間</div><div class="value" id="totalMin">0</div></div>
-          <div class="stat"><div class="label">135分との差</div><div class="value" id="diffMin">0</div></div>
-          <div class="stat"><div class="label">区間数</div><div class="value" id="segCount">0</div></div>
+          <div class="stat"><div class="label">総枠</div><div class="value" id="elapsedMin">0</div></div>
+          <div class="stat"><div class="label">実質時間</div><div class="value" id="totalMin">0</div></div>
+          <div class="stat"><div class="label">125分との差</div><div class="value" id="diffMin">0</div></div>
+          <div class="stat"><div class="label">休憩</div><div class="value" id="breakMin">0</div></div>
           <div class="stat"><div class="label">TKC準拠度</div><div class="value" id="scoreVal">0</div></div>
         </div>
         <div class="summary-banners">
@@ -339,11 +344,14 @@
 </div>
 
 <script>
-const TARGET = 135;
-const STORAGE_KEY = 'nmf2026-2.plan.v2';
+const SESSION_TARGET = 135;
+const BREAK_TARGET = 10;
+const ACTIVE_TARGET = SESSION_TARGET - BREAK_TARGET;
+const TARGET = ACTIVE_TARGET;
+const STORAGE_KEY = 'nmf2026-2.plan.v3';
 const CHECK_WEIGHTS = [16,14,14,16,10,10,8,12];
 const CHECK_BASES = [
-  '趣意書：「135分の対話型進行を、時間配分・候補スライド・台本まで一体で設計する」',
+  '趣意書：「135分の対話型進行を、時間配分・候補スライド・台本まで一体で設計する」／運営条件：休憩10分を含めて総枠135分',
   '趣意書：「入力・監査・業績管理・計画・ラストワンマイルを一本の線として回収する」',
   '趣意書：「正確な会計帳簿に基づく保証と経営助言へ収束させる」',
   '趣意書：「変動損益計算書を、未来の打ち手につながる対話ツールにする」',
@@ -368,6 +376,7 @@ const pillars = [
   {value:'5', label:'⑤継続MAS・未来接続'},
   {value:'6', label:'⑥ラストワンマイル・標準化'}
 ];
+const pillarOptions = pillars.concat([{value:'break', label:'休憩'}]);
 const types = [
   {value:'opening', label:'導入'},
   {value:'context', label:'問題提起'},
@@ -375,7 +384,8 @@ const types = [
   {value:'demo', label:'デモ'},
   {value:'case', label:'事例'},
   {value:'qa', label:'Q&A'},
-  {value:'summary', label:'まとめ'}
+  {value:'summary', label:'まとめ'},
+  {value:'break', label:'休憩'}
 ];
 const levels = [
   {value:'beginner', label:'初学者向け'},
@@ -383,7 +393,7 @@ const levels = [
   {value:'advanced', label:'経験者向け'}
 ];
 const leadClass = {facilitator:'lead-f', speakerA:'lead-a', speakerB:'lead-b', all:'lead-all'};
-const pillarColors = {'1':'#2563eb','2':'#4f46e5','3':'#8b5cf6','4':'#0d9488','5':'#16a34a','6':'#ea580c'};
+const pillarColors = {'1':'#2563eb','2':'#4f46e5','3':'#8b5cf6','4':'#0d9488','5':'#16a34a','6':'#ea580c','break':'#64748b'};
 
 let state = {segments:[], selectedId:null, view:'agenda'};
 let isBooting = true;
@@ -392,9 +402,12 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
 function nl2br(s){ return esc(s).replace(/\n/g,'<br>'); }
 function labelOf(list,v){ return (list.find(x=>x.value===v)||{label:v}).label; }
+function labelPillar(v){ return labelOf(pillarOptions,v); }
 function sum(arr,fn){ return arr.reduce((a,x)=>a+Number(fn(x)||0),0); }
 function seg(d){ return Object.assign({id:uid(), title:'新しい区間', start:0, duration:10, lead:'facilitator', pillar:'1', type:'discussion', level:'mixed', goal:'', prompt:'', speakerA:'', speakerB:'', takeaway:'', slides:'', thumbs:[]}, d||{}); }
 function cloneSegment(s){ return seg(JSON.parse(JSON.stringify(Object.assign({},s,{id:undefined})))); }
+function isBreak(s){ return s && (s.type==='break' || s.pillar==='break'); }
+function contentSegments(){ return state.segments.filter(s=>!isBreak(s)); }
 
 function balancedTemplate(){
   return [
@@ -407,7 +420,7 @@ function balancedTemplate(){
       slides:'★ 第6回レジュメ｜「適正な申告まで」対「保証・経営助言まで」\n○ 福山セミナー｜税理士の仕事観・未来への問題提起',
       thumbs:['r6_2','f20']
     }),
-    seg({title:'なぜ自計化なのか：記帳代行では本筋に届かない', start:12, duration:17, lead:'speakerA', pillar:'1', type:'discussion', level:'beginner',
+    seg({title:'なぜ自計化なのか：記帳代行では本筋に届かない', start:12, duration:15, lead:'speakerA', pillar:'1', type:'discussion', level:'beginner',
       goal:'顧問先が記帳代行を望む理由を否定せず、自計化が保証・経営助言の前提であることを示す。',
       prompt:'顧問先はなぜ記帳代行を望むのか。それでもTKC方式では、なぜ自計化を外せないのか。',
       speakerA:'抵抗理論を使い、惰性・労力・感情・心理的反発を整理する。',
@@ -416,7 +429,7 @@ function balancedTemplate(){
       slides:'★ NM自動化セミナー｜抵抗理論\n○ 第6回レジュメ｜付加価値は経営助言側に生まれる',
       thumbs:['nm4','r6_4']
     }),
-    seg({title:'土台づくり：初期設定・初期指導が後工程を決める', start:29, duration:22, lead:'speakerB', pillar:'2', type:'case', level:'mixed',
+    seg({title:'土台づくり：初期設定・初期指導が後工程を決める', start:27, duration:20, lead:'speakerB', pillar:'2', type:'case', level:'mixed',
       goal:'変動損益や継続MASの前に、正しい入力設計・証憑保存・データ連携が必要であることを確認する。',
       prompt:'未来計算に進む前に、なぜ初期設定・初期指導を軽く扱ってはいけないのか。',
       speakerA:'勘定科目・補助・課税区分・証憑保存・銀行信販の設計が、業績管理の品質を左右することを説明する。',
@@ -425,7 +438,7 @@ function balancedTemplate(){
       slides:'★ 福山セミナー｜顧問先DX Before/After\n○ 福山セミナー｜データ連携ハブとしてのFXシリーズ',
       thumbs:['f38','f31','f32']
     }),
-    seg({title:'月次巡回監査・事前確認：確認作業を助言時間へ変える', start:51, duration:17, lead:'speakerB', pillar:'3', type:'discussion', level:'mixed',
+    seg({title:'月次巡回監査・事前確認：確認作業を助言時間へ変える', start:47, duration:16, lead:'speakerB', pillar:'3', type:'discussion', level:'mixed',
       goal:'巡回監査と事前確認を、単なる作業効率化ではなく、助言の前提条件として位置づける。',
       prompt:'事前確認ができると、巡回監査と経営者対話はどう変わるのか。',
       speakerA:'会計事務所DX・一気通貫・使用人監督義務の観点から説明する。',
@@ -434,7 +447,11 @@ function balancedTemplate(){
       slides:'★ 福山セミナー｜巡回監査機能による事前確認\n○ 福山セミナー｜一気通貫・デジタルシームレス',
       thumbs:['f36','f43']
     }),
-    seg({title:'365日変動損益計算書：過去計算を未来の会話へ変える', start:68, duration:25, lead:'speakerA', pillar:'4', type:'demo', level:'mixed',
+    seg({title:'休憩', start:63, duration:10, lead:'facilitator', pillar:'break', type:'break', level:'mixed',
+      goal:'10分休憩。再開後は365日変動損益計算書から未来の打ち手へ接続する。',
+      takeaway:'再開時刻を確認する。'
+    }),
+    seg({title:'365日変動損益計算書：過去計算を未来の会話へ変える', start:73, duration:24, lead:'speakerA', pillar:'4', type:'demo', level:'mixed',
       goal:'変動損益計算書を、数字を見る資料ではなく、経営者の意思決定を変える対話ツールとして提示する。',
       prompt:'制度PLではなく、なぜ変動損益計算書だと未来の打ち手につながるのか。',
       speakerA:'限界利益率・固定費・必要売上・逆算の考え方を説明する。',
@@ -443,7 +460,7 @@ function balancedTemplate(){
       slides:'★ 第6回レジュメ｜変動損益計算書と意思決定\n○ 第6回レジュメ｜支出を売上換算するリフレーミング',
       thumbs:['r6_10','r6_7','r6_8']
     }),
-    seg({title:'継続MASへの接続：実績から計画へ橋を架ける', start:93, duration:20, lead:'speakerA', pillar:'5', type:'discussion', level:'mixed',
+    seg({title:'継続MASへの接続：実績から計画へ橋を架ける', start:97, duration:16, lead:'speakerA', pillar:'5', type:'discussion', level:'mixed',
       goal:'365日変動損益計算書と継続MASを同じ構造として理解させ、未来計算への移行を自然にする。',
       prompt:'変動損益計算書の理解が、なぜ継続MAS活用の近道になるのか。',
       speakerA:'自計化ソフトは実績、継続MASは計画。過去〜現在か未来かの違いにすぎないと整理する。',
@@ -475,7 +492,7 @@ function balancedTemplate(){
 
 function implementationTemplate(){
   const a = balancedTemplate();
-  a[0].duration=12; a[1].duration=14; a[2].duration=30; a[3].duration=24; a[4].duration=18; a[5].duration=16; a[6].duration=11; a[7].duration=10;
+  a[0].duration=10; a[1].duration=13; a[2].duration=27; a[3].duration=21; a[4].duration=10; a[5].duration=24; a[6].duration=8; a[7].duration=12; a[8].duration=10;
   autoSchedule(a);
   a[2].title='実装重視：初期設定・初期指導・証憑保存を厚く扱う';
   a[3].title='実装重視：事前確認と一気通貫を助言時間へ変える';
@@ -484,10 +501,10 @@ function implementationTemplate(){
 
 function futureTemplate(){
   const a = balancedTemplate();
-  a[0].duration=12; a[1].duration=14; a[2].duration=16; a[3].duration=16; a[4].duration=28; a[5].duration=28; a[6].duration=11; a[7].duration=10;
+  a[0].duration=10; a[1].duration=12; a[2].duration=17; a[3].duration=17; a[4].duration=10; a[5].duration=27; a[6].duration=21; a[7].duration=11; a[8].duration=10;
   autoSchedule(a);
-  a[4].title='未来接続強調：変動損益計算書で意思決定を変える';
-  a[5].title='未来接続強調：継続MASを標準業務へ接続する';
+  a[5].title='未来接続強調：変動損益計算書で意思決定を変える';
+  a[6].title='未来接続強調：継続MASを標準業務へ接続する';
   return a;
 }
 
@@ -504,10 +521,12 @@ function autoSchedule(arr=state.segments){
   arr.forEach(s=>{s.start=t; t+=Number(s.duration||0);});
 }
 
-function totalMinutes(){ return sum(state.segments, s=>s.duration); }
+function elapsedMinutes(){ return sum(state.segments, s=>s.duration); }
+function breakMinutes(){ return sum(state.segments, s=>isBreak(s)?s.duration:0); }
+function totalMinutes(){ return sum(state.segments, s=>isBreak(s)?0:s.duration); }
 function totalsBy(key){
   const out={};
-  state.segments.forEach(s=>{ out[s[key]]=(out[s[key]]||0)+Number(s.duration||0); });
+  contentSegments().forEach(s=>{ out[s[key]]=(out[s[key]]||0)+Number(s.duration||0); });
   return out;
 }
 function saveState(){
@@ -529,31 +548,36 @@ function loadSavedState(){
 
 function buildChecks(){
   const total=totalMinutes();
+  const elapsed=elapsedMinutes();
+  const breaks=breakMinutes();
   const pt=totalsBy('pillar');
   const foundation=(pt['2']||0)+(pt['3']||0);
   const future=(pt['5']||0)+(pt['6']||0);
   const performance=(pt['4']||0);
   const allPillars=['1','2','3','4','5','6'].filter(p=>(pt[p]||0)>0);
   const first={};
-  state.segments.forEach((s,i)=>{ if(first[s.pillar]===undefined) first[s.pillar]=i; });
+  contentSegments().forEach((s,i)=>{ if(first[s.pillar]===undefined) first[s.pillar]=i; });
   const orderOk = ['1','2','3','4','5'].every((p,i,arr)=> i===0 || first[arr[i-1]]===undefined || first[p]===undefined || first[arr[i-1]] <= first[p]);
-  const dialogue = sum(state.segments, s => (['discussion','qa','case'].includes(s.type)||s.lead==='all') ? s.duration : 0);
+  const dialogue = sum(contentSegments(), s => (['discussion','qa','case'].includes(s.type)||s.lead==='all') ? s.duration : 0);
   const practicalWords = /打ち手|経営者|未来|対話|逆算|意思決定|保証|経営助言/;
-  const practical = sum(state.segments, s => {
+  const practical = sum(contentSegments(), s => {
     const hasTakeaway = String(s.takeaway||'').trim();
     const hasStatementWord = practicalWords.test([s.goal,s.prompt,s.speakerA,s.speakerB,s.takeaway].join(' '));
     return (hasTakeaway || hasStatementWord || ['demo','case','qa'].includes(s.type)) ? s.duration : 0;
   });
-  const actionable = state.segments.filter(s => String(s.takeaway||'').trim()).length;
+  const actionable = contentSegments().filter(s => String(s.takeaway||'').trim()).length;
+  const contentCount = contentSegments().length;
+  const timeOk = elapsed===SESSION_TARGET && total===ACTIVE_TARGET && breaks===BREAK_TARGET;
+  const timeWarn = Math.abs(elapsed-SESSION_TARGET)<=5 && Math.abs(total-ACTIVE_TARGET)<=5 && Math.abs(breaks-BREAK_TARGET)<=5;
   const checks = [];
-  checks.push({name:'135分固定設計', ok: total===TARGET, warn: Math.abs(total-TARGET)<=5, text: total===TARGET?'135分ちょうどです。':`合計${total}分です。135分との差を調整してください。`});
+  checks.push({name:'135分内・実質125分設計', ok: timeOk, warn: timeWarn, text: timeOk?'総枠135分（実質125分＋休憩10分）です。':`総枠${elapsed}分、実質${total}分、休憩${breaks}分です。総枠135分・実質125分・休憩10分に調整してください。`});
   checks.push({name:'6本柱の網羅', ok: allPillars.length>=6, warn: allPillars.length>=5, text: allPillars.length>=6?'6本柱をすべて含んでいます。':`含まれる柱は${allPillars.length}本です。欠落がないか確認してください。`});
-  checks.push({name:'土台の厚み', ok: foundation>=36, warn: foundation>=30, text:`初期設定・事前確認の土台は${foundation}分です。未来の話の前提として十分か確認してください。`});
-  checks.push({name:'業績管理（柱4）の厚み', ok: performance>=24, warn: performance>=18, text:`365日変動損益計算書など柱4は${performance}分です。未来の打ち手へ進む前の中核として十分か確認してください。`});
-  checks.push({name:'未来・AIの出過ぎ防止', ok: future<=50, warn: future<=58, text:`継続MAS・AI等の未来接続は${future}分です。土台を飛ばしていないか確認してください。`});
+  checks.push({name:'土台の厚み', ok: foundation>=34, warn: foundation>=28, text:`初期設定・事前確認の土台は${foundation}分です。未来の話の前提として十分か確認してください。`});
+  checks.push({name:'業績管理（柱4）の厚み', ok: performance>=22, warn: performance>=17, text:`365日変動損益計算書など柱4は${performance}分です。未来の打ち手へ進む前の中核として十分か確認してください。`});
+  checks.push({name:'未来・AIの出過ぎ防止', ok: future<=46, warn: future<=54, text:`継続MAS・AI等の未来接続は${future}分です。土台を飛ばしていないか確認してください。`});
   checks.push({name:'順序の自然さ', ok: orderOk, warn:false, text: orderOk?'自計化→土台→監査→業績→MASの順序が自然です。':'柱の順序が逆流しています。TKC方式の文脈が伝わりにくくなります。'});
-  checks.push({name:'対話時間の確保', ok: dialogue>=50, warn: dialogue>=40, text:`対話・事例・Q&A系は${dialogue}分です。講義一方通行にならないか確認してください。`});
-  checks.push({name:'聴講者の再現可能性', ok: practical>=45 && actionable>=Math.max(6,state.segments.length-1), warn: practical>=35 && actionable>=5, text:`趣意書語彙・デモ・事例・持ち帰り欄につながる時間は${practical}分、持ち帰り設定は${actionable}区間です。まず1社で経営者と話せる粒度か確認してください。`});
+  checks.push({name:'対話時間の確保', ok: dialogue>=46, warn: dialogue>=37, text:`対話・事例・Q&A系は${dialogue}分です。講義一方通行にならないか確認してください。`});
+  checks.push({name:'聴講者の再現可能性', ok: practical>=42 && actionable>=Math.max(6,contentCount-1), warn: practical>=32 && actionable>=5, text:`趣意書語彙・デモ・事例・持ち帰り欄につながる時間は${practical}分、持ち帰り設定は${actionable}区間です。まず1社で経営者と話せる粒度か確認してください。`});
   return checks.map((c,i)=>Object.assign(c,{status:c.ok?'ok':c.warn?'warn':'bad', weight:CHECK_WEIGHTS[i], basis:CHECK_BASES[i]}));
 }
 
@@ -575,14 +599,17 @@ function render(){
 }
 
 function renderStats(){
-  const total=totalMinutes(), diff=total-TARGET, checks=buildChecks(), score=scoreChecks(checks);
+  const total=totalMinutes(), elapsed=elapsedMinutes(), breaks=breakMinutes(), diff=total-TARGET, checks=buildChecks(), score=scoreChecks(checks);
+  const timeOk = elapsed===SESSION_TARGET && total===ACTIVE_TARGET && breaks===BREAK_TARGET;
+  const timeWarn = Math.abs(elapsed-SESSION_TARGET)<=5 && Math.abs(total-ACTIVE_TARGET)<=5 && Math.abs(breaks-BREAK_TARGET)<=5;
+  document.getElementById('elapsedMin').textContent=elapsed;
   document.getElementById('totalMin').textContent=total;
   document.getElementById('diffMin').textContent=diff>0?`+${diff}`:String(diff);
-  document.getElementById('segCount').textContent=state.segments.length;
+  document.getElementById('breakMin').textContent=breaks;
   document.getElementById('scoreVal').textContent=score;
   const tb=document.getElementById('timeBanner');
-  tb.className='banner '+(diff===0?'ok':Math.abs(diff)<=5?'warn':'bad');
-  tb.textContent=diff===0?'135分ちょうどです。':diff<0?`あと${Math.abs(diff)}分余裕があります。`:`${diff}分オーバーしています。`;
+  tb.className='banner '+(timeOk?'ok':timeWarn?'warn':'bad');
+  tb.textContent=timeOk?'総枠135分（実質125分＋休憩10分）です。':`総枠${elapsed}分、実質${total}分、休憩${breaks}分です。`;
   const sb=document.getElementById('scoreBanner');
   sb.className='banner '+(score>=85?'ok':score>=65?'warn':'bad');
   sb.textContent=score>=85?`TKC方式への準拠度は高いです（${score}点）。`:score>=65?`方向性は良いですが補強余地があります（${score}点）。`:`本筋がぶれる恐れがあります（${score}点）。`;
@@ -600,7 +627,7 @@ function renderThumbs(keys, compact=false){
 function renderAgenda(){
   const root=document.getElementById('agendaList');
   root.innerHTML=state.segments.map((s,i)=>`
-    <article class="segment ${s.id===state.selectedId?'active':''}">
+    <article class="segment ${s.id===state.selectedId?'active':''} ${isBreak(s)?'break':''}">
       <div class="seg-top">
         <div>
           <div class="seg-title">${i+1}. ${esc(s.title)}</div>
@@ -609,7 +636,7 @@ function renderAgenda(){
             <span class="tag">${s.duration}分</span>
             <span class="tag">${esc(labelOf(types,s.type))}</span>
             <span class="tag ${leadClass[s.lead]}">${esc(labelOf(leads,s.lead))}</span>
-            <span class="tag pillar-${s.pillar}">${esc(labelOf(pillars,s.pillar))}</span>
+            <span class="tag pillar-${s.pillar}">${esc(labelPillar(s.pillar))}</span>
           </div>
         </div>
         <div class="card-actions">
@@ -617,13 +644,17 @@ function renderAgenda(){
           <button class="btn-soft" data-dup="${s.id}">複製</button>
         </div>
       </div>
-      <div class="seg-grid">
-        <div class="mini"><strong>狙い</strong>${nl2br(s.goal)}</div>
-        <div class="mini"><strong>天野先生の問い</strong>${nl2br(s.prompt)}</div>
-        <div class="mini"><strong>松本</strong>${nl2br(s.speakerA)}</div>
-        <div class="mini"><strong>大森先生</strong>${nl2br(s.speakerB)}</div>
-        <div class="mini" style="grid-column:1/-1"><strong>採用候補スライド</strong>${nl2br(s.slides)}${renderThumbs(s.thumbs)}</div>
-      </div>
+      ${isBreak(s)?`
+        <div class="mini break-note"><strong>休憩</strong>${nl2br(s.goal||'休憩時間。再開時刻を確認します。')}</div>
+      `:`
+        <div class="seg-grid">
+          <div class="mini"><strong>狙い</strong>${nl2br(s.goal)}</div>
+          <div class="mini"><strong>天野先生の問い</strong>${nl2br(s.prompt)}</div>
+          <div class="mini"><strong>松本</strong>${nl2br(s.speakerA)}</div>
+          <div class="mini"><strong>大森先生</strong>${nl2br(s.speakerB)}</div>
+          <div class="mini" style="grid-column:1/-1"><strong>採用候補スライド</strong>${nl2br(s.slides)}${renderThumbs(s.thumbs)}</div>
+        </div>
+      `}
     </article>
   `).join('');
 }
@@ -639,7 +670,7 @@ function renderEditor(){
 
 function renderGantt(){
   const root=document.getElementById('ganttRows');
-  const total=Math.max(TARGET,totalMinutes(),1);
+  const total=Math.max(SESSION_TARGET,elapsedMinutes(),1);
   root.innerHTML=state.segments.map((s,i)=>{
     const left=(Number(s.start)/total)*100;
     const width=(Number(s.duration)/total)*100;
@@ -648,16 +679,25 @@ function renderGantt(){
 }
 
 function buildScriptText(){
-  return state.segments.map((s,i)=>[
-    `【${i+1}】${s.start}〜${s.start+Number(s.duration)}分　${s.title}`,
-    `主担当：${labelOf(leads,s.lead)}　柱：${labelOf(pillars,s.pillar)}`,
-    `狙い：${s.goal}`,
-    `天野先生の問い：${s.prompt}`,
-    `松本の押さえどころ：${s.speakerA}`,
-    `大森先生の押さえどころ：${s.speakerB}`,
-    `持ち帰り：${s.takeaway}`,
-    `候補スライド：\n${s.slides}`
-  ].join('\n')).join('\n\n'+'='.repeat(48)+'\n\n');
+  return state.segments.map((s,i)=>{
+    if(isBreak(s)){
+      return [
+        `【${i+1}】${s.start}〜${s.start+Number(s.duration)}分　${s.title}`,
+        `区分：休憩`,
+        `メモ：${s.goal || '再開時刻を確認します。'}`
+      ].join('\n');
+    }
+    return [
+      `【${i+1}】${s.start}〜${s.start+Number(s.duration)}分　${s.title}`,
+      `主担当：${labelOf(leads,s.lead)}　柱：${labelPillar(s.pillar)}`,
+      `狙い：${s.goal}`,
+      `天野先生の問い：${s.prompt}`,
+      `松本の押さえどころ：${s.speakerA}`,
+      `大森先生の押さえどころ：${s.speakerB}`,
+      `持ち帰り：${s.takeaway}`,
+      `候補スライド：\n${s.slides}`
+    ].join('\n');
+  }).join('\n\n'+'='.repeat(48)+'\n\n');
 }
 
 function renderScript(){ document.getElementById('scriptOutput').textContent=buildScriptText(); }
@@ -727,22 +767,60 @@ function duplicate(id){
   autoSchedule(); state.selectedId=c.id; render();
 }
 function addSegment(){
-  const s=seg({title:'追加区間', start:totalMinutes(), duration:10, prompt:'この区間で何を問い、どちらの講師に何を答えてもらうかを設定してください。'});
+  const s=seg({title:'追加区間', start:elapsedMinutes(), duration:10, prompt:'この区間で何を問い、どちらの講師に何を答えてもらうかを設定してください。'});
   state.segments.push(s); state.selectedId=s.id; render();
 }
 
 function exportJson(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v55.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v58.json'; a.click(); URL.revokeObjectURL(a.href);
 }
 function importJson(file){
   const r=new FileReader();
   r.onload=()=>{ try{ const data=JSON.parse(r.result); if(!Array.isArray(data.segments)) throw new Error('segmentsなし'); state.segments=data.segments.map(x=>seg(x)); state.selectedId=data.selectedId||state.segments[0]?.id||null; render(); }catch(e){ alert('JSONを読み込めませんでした。'); } };
   r.readAsText(file,'utf-8');
 }
+function statePayload(){ return {segments:state.segments, selectedId:state.selectedId, view:state.view}; }
+function base64UrlEncode(text){
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  bytes.forEach(b=>{ binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function base64UrlDecode(text){
+  const normalized = text.replace(/-/g,'+').replace(/_/g,'/');
+  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, ch=>ch.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+function buildShareUrl(){
+  const url = new URL(location.href);
+  url.hash = 'plan=' + base64UrlEncode(JSON.stringify(statePayload()));
+  return url.toString();
+}
+function copyShareLink(){ copyText(buildShareUrl()); }
+function loadShareFromUrl(){
+  const params = new URLSearchParams(location.hash.replace(/^#/,''));
+  const raw = params.get('plan');
+  if(!raw) return false;
+  try{
+    const data = JSON.parse(base64UrlDecode(raw));
+    if(!Array.isArray(data.segments)) throw new Error('segmentsなし');
+    state.segments = data.segments.map(x=>seg(x));
+    state.selectedId = data.selectedId || state.segments[0]?.id || null;
+    state.view = data.view || 'agenda';
+    autoSchedule();
+    if(typeof history !== 'undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
+    return true;
+  }catch(e){
+    alert('共有リンクを読み込めませんでした。');
+    return false;
+  }
+}
 async function copyText(txt){ try{ await navigator.clipboard.writeText(txt); alert('コピーしました。'); }catch(e){ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('コピーしました。'); } }
 function downloadText(){ const blob=new Blob([buildScriptText()],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_script.txt'; a.click(); URL.revokeObjectURL(a.href); }
-function copyGantt(){ copyText(state.segments.map((s,i)=>`${i+1}. ${s.start}-${s.start+Number(s.duration)}分｜${labelOf(pillars,s.pillar)}｜${labelOf(leads,s.lead)}｜${s.title}`).join('\n')); }
+function copyGantt(){ copyText(state.segments.map((s,i)=>`${i+1}. ${s.start}-${s.start+Number(s.duration)}分｜${labelPillar(s.pillar)}｜${labelOf(leads,s.lead)}｜${s.title}`).join('\n')); }
 
 function openThumb(key){
   const a=thumbnailAssets[key]; if(!a) return;
@@ -758,7 +836,7 @@ function closeModal(){
 }
 
 function fillSelect(id, list){ document.getElementById(id).innerHTML=list.map(x=>`<option value="${x.value}">${x.label}</option>`).join(''); }
-fillSelect('e_lead',leads); fillSelect('e_pillar',pillars); fillSelect('e_type',types); fillSelect('e_level',levels);
+fillSelect('e_lead',leads); fillSelect('e_pillar',pillarOptions); fillSelect('e_type',types); fillSelect('e_level',levels);
 
 document.addEventListener('click', e=>{
   const t=e.target.closest('[data-thumb]'); if(t) openThumb(t.dataset.thumb);
@@ -773,6 +851,7 @@ document.getElementById('addSegBtn').onclick=addSegment;
 document.getElementById('autoBtn').onclick=()=>{autoSchedule();render();};
 document.getElementById('exportBtn').onclick=exportJson;
 document.getElementById('importBtn').onclick=()=>document.getElementById('jsonInput').click();
+document.getElementById('shareLinkBtn').onclick=copyShareLink;
 document.getElementById('jsonInput').onchange=e=>{ if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=''; };
 document.getElementById('upBtn').onclick=()=>moveSelected(-1);
 document.getElementById('downBtn').onclick=()=>moveSelected(1);
@@ -787,9 +866,9 @@ document.getElementById('copyGanttBtn').onclick=copyGantt;
  ['e_goal','goal'],['e_prompt','prompt'],['e_a','speakerA'],['e_b','speakerB'],['e_takeaway','takeaway'],['e_slides','slides'],['e_thumbs','thumbs']
 ].forEach(([id,field])=>document.getElementById(id).addEventListener('input',e=>updateSelected(field,e.target.value)));
 
-if(loadSavedState()) render();
-else setTemplate('balanced');
 isBooting = false;
+if(loadShareFromUrl() || loadSavedState()) render();
+else setTemplate('balanced');
 saveState();
 </script>
 </body>
