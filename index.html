@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NMF第2分科会 145分設計ツール v5.6</title>
+<title>NMF第2分科会 135分設計ツール v5.7</title>
 <style>
   :root {
     --bg:#f4f7fb;
@@ -202,7 +202,7 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>NMF第2分科会 145分設計ツール v5.6</h1>
+    <h1>NMF第2分科会 135分設計ツール v5.7</h1>
     <p>ファシリテーター（天野先生）、講師2名（大森先生・松本）の対話型進行を、TKC方式の本筋から外さず、時間配分・候補スライド・ガントチャート・台本・準拠度まで一体で設計します。</p>
     <div class="toolbar">
       <button class="btn-hero" data-template="balanced">TKC本筋テンプレート</button>
@@ -266,7 +266,7 @@
       <div class="overview-status">
         <div class="stats">
           <div class="stat"><div class="label">合計時間</div><div class="value" id="totalMin">0</div></div>
-          <div class="stat"><div class="label">145分との差</div><div class="value" id="diffMin">0</div></div>
+          <div class="stat"><div class="label">135分との差</div><div class="value" id="diffMin">0</div></div>
           <div class="stat"><div class="label">区間数</div><div class="value" id="segCount">0</div></div>
           <div class="stat"><div class="label">TKC準拠度</div><div class="value" id="scoreVal">0</div></div>
         </div>
@@ -290,7 +290,7 @@
         <h3>全体ガントチャート</h3>
         <p class="small">色はTKC方式の6本柱です。時間配分と順序の崩れを一目で確認します。</p>
         <div class="gantt-wrap">
-          <div class="scale"><span>0分</span><span>20分</span><span>40分</span><span>60分</span><span>80分</span><span>100分</span><span>120分</span><span>125〜145分</span></div>
+          <div class="scale"><span>0分</span><span>20分</span><span>40分</span><span>60分</span><span>80分</span><span>100分</span><span>120分</span><span>125〜135分</span></div>
           <div id="ganttRows"></div>
         </div>
         <div class="actions"><button class="btn-soft" id="copyGanttBtn">ガント概要コピー</button></div>
@@ -339,11 +339,11 @@
 </div>
 
 <script>
-const TARGET = 145;
-const STORAGE_KEY = 'nmf2026-2.plan.v1';
+const TARGET = 135;
+const STORAGE_KEY = 'nmf2026-2.plan.v2';
 const CHECK_WEIGHTS = [16,14,14,16,10,10,8,12];
 const CHECK_BASES = [
-  '趣意書：「145分の対話型進行を、時間配分・候補スライド・台本まで一体で設計する」',
+  '趣意書：「135分の対話型進行を、時間配分・候補スライド・台本まで一体で設計する」',
   '趣意書：「入力・監査・業績管理・計画・ラストワンマイルを一本の線として回収する」',
   '趣意書：「正確な会計帳簿に基づく保証と経営助言へ収束させる」',
   '趣意書：「変動損益計算書を、未来の打ち手につながる対話ツールにする」',
@@ -452,7 +452,7 @@ function balancedTemplate(){
       slides:'★ 第6回レジュメ｜継続MASと変動損益計算書は構造が同じ\n○ 第6回レジュメ｜実績と計画の接続',
       thumbs:['r6_14','r6_10']
     }),
-    seg({title:'ラストワンマイル：AI・ツールで思想を現場に届け切る', start:113, duration:22, lead:'all', pillar:'6', type:'case', level:'advanced',
+    seg({title:'ラストワンマイル：AI・ツールで思想を現場に届け切る', start:113, duration:12, lead:'all', pillar:'6', type:'case', level:'advanced',
       goal:'AIや自作ツールを、TKC方式の代替ではなく、職員教育・顧問先説明・標準化の補助線として位置づける。',
       prompt:'良い考え方があっても現場で再現されない。その最後の距離をどう埋めるのか。',
       speakerA:'ツールは思想の実装装置であり、変動PL・限界利益率・打ち手検討をわかりやすく届けるものだと説明する。',
@@ -461,7 +461,7 @@ function balancedTemplate(){
       slides:'★ 福山セミナー｜AI活用事例・ツール作成\n○ 福山セミナー｜DXは高付加価値経営のため',
       thumbs:['f46','f48','f49']
     }),
-    seg({title:'会場との対話・締め：未来へつながるシステム活用', start:135, duration:10, lead:'facilitator', pillar:'5', type:'summary', level:'mixed',
+    seg({title:'会場との対話・締め：未来へつながるシステム活用', start:125, duration:10, lead:'facilitator', pillar:'5', type:'summary', level:'mixed',
       goal:'入力・監査・業績管理・計画・ラストワンマイルを一本の線として回収する。',
       prompt:'今日の話を自分の事務所に持ち帰るなら、まず何を変えるべきか。',
       speakerA:'本筋の再確認。正確な会計帳簿に基づく保証と経営助言へ収束させる。',
@@ -475,7 +475,7 @@ function balancedTemplate(){
 
 function implementationTemplate(){
   const a = balancedTemplate();
-  a[0].duration=12; a[1].duration=14; a[2].duration=30; a[3].duration=24; a[4].duration=18; a[5].duration=16; a[6].duration=21; a[7].duration=10;
+  a[0].duration=12; a[1].duration=14; a[2].duration=30; a[3].duration=24; a[4].duration=18; a[5].duration=16; a[6].duration=11; a[7].duration=10;
   autoSchedule(a);
   a[2].title='実装重視：初期設定・初期指導・証憑保存を厚く扱う';
   a[3].title='実装重視：事前確認と一気通貫を助言時間へ変える';
@@ -484,7 +484,7 @@ function implementationTemplate(){
 
 function futureTemplate(){
   const a = balancedTemplate();
-  a[0].duration=12; a[1].duration=14; a[2].duration=16; a[3].duration=16; a[4].duration=28; a[5].duration=28; a[6].duration=21; a[7].duration=10;
+  a[0].duration=12; a[1].duration=14; a[2].duration=16; a[3].duration=16; a[4].duration=28; a[5].duration=28; a[6].duration=11; a[7].duration=10;
   autoSchedule(a);
   a[4].title='未来接続強調：変動損益計算書で意思決定を変える';
   a[5].title='未来接続強調：継続MASを標準業務へ接続する';
@@ -546,7 +546,7 @@ function buildChecks(){
   });
   const actionable = state.segments.filter(s => String(s.takeaway||'').trim()).length;
   const checks = [];
-  checks.push({name:'145分固定設計', ok: total===TARGET, warn: Math.abs(total-TARGET)<=5, text: total===TARGET?'145分ちょうどです。':`合計${total}分です。145分との差を調整してください。`});
+  checks.push({name:'135分固定設計', ok: total===TARGET, warn: Math.abs(total-TARGET)<=5, text: total===TARGET?'135分ちょうどです。':`合計${total}分です。135分との差を調整してください。`});
   checks.push({name:'6本柱の網羅', ok: allPillars.length>=6, warn: allPillars.length>=5, text: allPillars.length>=6?'6本柱をすべて含んでいます。':`含まれる柱は${allPillars.length}本です。欠落がないか確認してください。`});
   checks.push({name:'土台の厚み', ok: foundation>=36, warn: foundation>=30, text:`初期設定・事前確認の土台は${foundation}分です。未来の話の前提として十分か確認してください。`});
   checks.push({name:'業績管理（柱4）の厚み', ok: performance>=24, warn: performance>=18, text:`365日変動損益計算書など柱4は${performance}分です。未来の打ち手へ進む前の中核として十分か確認してください。`});
@@ -582,7 +582,7 @@ function renderStats(){
   document.getElementById('scoreVal').textContent=score;
   const tb=document.getElementById('timeBanner');
   tb.className='banner '+(diff===0?'ok':Math.abs(diff)<=5?'warn':'bad');
-  tb.textContent=diff===0?'145分ちょうどです。':diff<0?`あと${Math.abs(diff)}分余裕があります。`:`${diff}分オーバーしています。`;
+  tb.textContent=diff===0?'135分ちょうどです。':diff<0?`あと${Math.abs(diff)}分余裕があります。`:`${diff}分オーバーしています。`;
   const sb=document.getElementById('scoreBanner');
   sb.className='banner '+(score>=85?'ok':score>=65?'warn':'bad');
   sb.textContent=score>=85?`TKC方式への準拠度は高いです（${score}点）。`:score>=65?`方向性は良いですが補強余地があります（${score}点）。`:`本筋がぶれる恐れがあります（${score}点）。`;
