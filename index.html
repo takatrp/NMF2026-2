@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NMF第2分科会 135分内休憩10分設計ツール v5.9</title>
+<title>NMF第2分科会 135分内休憩10分設計ツール v5.10</title>
 <style>
   :root {
     --bg:#f4f7fb;
@@ -65,10 +65,9 @@
   .btn-dark{background:var(--navy);color:#fff}
   .btn-soft{background:#f8fafc;border-color:var(--line)}
   .btn-danger{background:#fff1f2;border-color:#fecdd3;color:#be123c}
-  .layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,22vw,380px);gap:14px;align-items:start}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
   .layout>*{min-width:0}
   .overview-panel{grid-column:1;grid-row:1;order:1}
-  .editor-panel{grid-column:2;grid-row:1;order:2;max-height:calc(100vh - 112px);overflow:auto}
   .panel{
     background:var(--panel);
     border:1px solid var(--line);
@@ -112,6 +111,9 @@
   .seg-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:9px}
   .seg-top>div{min-width:0}
   .seg-title{font-weight:900;font-size:16px;line-height:1.35}
+  .seg-title[data-edit-title]{cursor:pointer;border-radius:6px;outline:none}
+  .seg-title[data-edit-title]:hover{color:var(--blue)}
+  .seg-title[data-edit-title]:focus-visible{box-shadow:0 0 0 3px var(--blue2)}
   .seg-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .tag{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;border:1px solid var(--line);background:#f8fafc;color:var(--muted)}
   .lead-f{background:#e0f2fe;color:#075985;border-color:#bae6fd}
@@ -175,14 +177,19 @@
   .modal-head strong{font-size:15px}
   .modal-card img{width:100%;display:block;background:#f1f5f9}
   .modal-note{padding:12px 14px;color:var(--muted);line-height:1.6}
+  .edit-modal-card{width:min(94vw,920px);max-height:92vh;overflow:hidden;display:flex;flex-direction:column}
+  .edit-modal-body{padding:14px 16px 4px;overflow:auto}
+  .edit-modal-body textarea{min-height:82px}
+  .edit-modal-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:#f8fafc}
+  .edit-modal-foot .actions{margin-top:0}
+  body.modal-open{overflow:hidden}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .tab{background:#f8fafc;border:1px solid var(--line)}
   .tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
   .hidden{display:none!important}
   @media (max-width:1180px){
     .layout{grid-template-columns:1fr}
-    .overview-panel,.editor-panel,.right-panel{grid-column:1;grid-row:auto}
-    .editor-panel{max-height:none;overflow:visible}
+    .overview-panel,.right-panel{grid-column:1;grid-row:auto}
     .right-panel{order:3}
     .overview-status{grid-template-columns:1fr}
     .section-list{grid-auto-columns:minmax(280px,min(82vw,360px));height:clamp(420px,calc(100vh - 300px),700px)}
@@ -200,9 +207,15 @@
     .section-list{grid-auto-columns:minmax(260px,88vw);height:clamp(420px,calc(100vh - 260px),640px)}
     .right-panel{grid-template-columns:1fr}
     .stats{grid-template-columns:1fr 1fr}
+    .modal{padding:8px}
+    .edit-modal-card{width:100%;max-height:96vh}
+    .edit-modal-body{padding:12px 12px 2px}
+    .edit-modal-foot{align-items:stretch;flex-direction:column-reverse;padding:10px 12px}
+    .edit-modal-foot .actions{width:100%}
+    .edit-modal-foot button{flex:1}
   }
   @media print{
-    .hero .toolbar,.editor-panel,.right-panel,.actions,.tabs,.no-print{display:none!important}
+    .hero .toolbar,.right-panel,.actions,.tabs,.no-print{display:none!important}
     body{background:#fff}
     .layout{display:block}
     .panel,.hero{box-shadow:none}
@@ -213,7 +226,7 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>NMF第2分科会 135分内休憩10分設計ツール v5.9</h1>
+    <h1>NMF第2分科会 135分内休憩10分設計ツール v5.10</h1>
     <p>ファシリテーター（天野先生）、講師2名（大森先生・松本）の対話型進行を、TKC方式の本筋から外さず、時間配分・候補スライド・ガントチャート・台本・準拠度まで一体で設計します。</p>
     <div class="toolbar">
       <button class="btn-hero" data-template="balanced">TKC本筋テンプレート</button>
@@ -229,39 +242,6 @@
   </section>
 
   <div class="layout">
-    <aside class="panel editor-panel">
-      <h2>選択中区間の編集</h2>
-      <p class="small">中央の区間を選択すると編集できます。画像はキーで紐づいているため、JSON保存・読込後も表示されます。</p>
-      <div id="emptyEditor" class="banner warn">編集する区間を選択してください。</div>
-      <div id="editor" class="hidden">
-        <div class="field"><label>タイトル</label><input id="e_title"></div>
-        <div class="row2">
-          <div class="field"><label>開始分</label><input id="e_start" type="number" min="0"></div>
-          <div class="field"><label>所要分</label><input id="e_duration" type="number" min="1"></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label>主担当</label><select id="e_lead"></select></div>
-          <div class="field"><label>柱</label><select id="e_pillar"></select></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label>区分</label><select id="e_type"></select></div>
-          <div class="field"><label>対象成熟度</label><select id="e_level"></select></div>
-        </div>
-        <div class="field"><label>狙い</label><textarea id="e_goal"></textarea></div>
-        <div class="field"><label>天野先生の問い</label><textarea id="e_prompt"></textarea></div>
-        <div class="field"><label>松本の押さえどころ</label><textarea id="e_a"></textarea></div>
-        <div class="field"><label>大森先生の押さえどころ</label><textarea id="e_b"></textarea></div>
-        <div class="field"><label>持ち帰り</label><textarea id="e_takeaway"></textarea></div>
-        <div class="field"><label>採用候補スライド説明</label><textarea id="e_slides"></textarea></div>
-        <div class="field"><label>サムネイルキー（カンマ区切り）</label><input id="e_thumbs" placeholder="例：r6_2,nm4,f20"></div>
-        <div class="actions">
-          <button class="btn-soft" id="upBtn">上へ</button>
-          <button class="btn-soft" id="downBtn">下へ</button>
-          <button class="btn-danger" id="delBtn">削除</button>
-        </div>
-      </div>
-    </aside>
-
     <main class="panel overview-panel">
       <div class="overview-head">
         <div>
@@ -348,6 +328,45 @@
     </div>
     <img id="modalImg" alt="">
     <div class="modal-note" id="modalNote"></div>
+  </div>
+</div>
+
+<div id="editModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" aria-hidden="true">
+  <div class="modal-card edit-modal-card">
+    <div class="modal-head">
+      <strong id="editModalTitle">区間を編集</strong>
+      <button class="btn-soft" id="editModalClose" aria-label="編集画面を閉じる">閉じる</button>
+    </div>
+    <div class="edit-modal-body" id="editor">
+      <div class="field"><label>タイトル</label><input id="e_title"></div>
+      <div class="row2">
+        <div class="field"><label>開始分</label><input id="e_start" type="number" min="0"></div>
+        <div class="field"><label>所要分</label><input id="e_duration" type="number" min="1"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>主担当</label><select id="e_lead"></select></div>
+        <div class="field"><label>柱</label><select id="e_pillar"></select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>区分</label><select id="e_type"></select></div>
+        <div class="field"><label>対象成熟度</label><select id="e_level"></select></div>
+      </div>
+      <div class="field"><label>狙い</label><textarea id="e_goal"></textarea></div>
+      <div class="field"><label>天野先生の問い</label><textarea id="e_prompt"></textarea></div>
+      <div class="field"><label>松本の押さえどころ</label><textarea id="e_a"></textarea></div>
+      <div class="field"><label>大森先生の押さえどころ</label><textarea id="e_b"></textarea></div>
+      <div class="field"><label>持ち帰り</label><textarea id="e_takeaway"></textarea></div>
+      <div class="field"><label>採用候補スライド説明</label><textarea id="e_slides"></textarea></div>
+      <div class="field"><label>サムネイルキー（カンマ区切り）</label><input id="e_thumbs" placeholder="例：r6_2,nm4,f20"></div>
+    </div>
+    <div class="edit-modal-foot">
+      <div class="actions">
+        <button class="btn-soft" id="upBtn">上へ</button>
+        <button class="btn-soft" id="downBtn">下へ</button>
+        <button class="btn-danger" id="delBtn">削除</button>
+      </div>
+      <button class="btn-primary" id="editModalDone">編集を完了</button>
+    </div>
   </div>
 </div>
 
@@ -733,7 +752,7 @@ function renderAgenda(){
     <article class="segment ${s.id===state.selectedId?'active':''} ${isBreak(s)?'break':''}">
       <div class="seg-top">
         <div>
-          <div class="seg-title">${i+1}. ${esc(s.title)}</div>
+          <div class="seg-title" data-edit-title="${s.id}" tabindex="0" role="button" aria-label="${esc(s.title)}を編集" title="ダブルクリックで編集">${i+1}. ${esc(s.title)}</div>
           <div class="seg-meta">
             <span class="tag">${s.start}〜${s.start+Number(s.duration)}分</span>
             <span class="tag">${s.duration}分</span>
@@ -764,9 +783,11 @@ function renderAgenda(){
 
 function renderEditor(){
   const s=state.segments.find(x=>x.id===state.selectedId);
-  document.getElementById('emptyEditor').classList.toggle('hidden', !!s);
-  document.getElementById('editor').classList.toggle('hidden', !s);
   if(!s) return;
+  const i=state.segments.findIndex(x=>x.id===s.id);
+  document.getElementById('editModalTitle').textContent=`${i+1}. ${s.title}`;
+  document.getElementById('upBtn').disabled=i<=0;
+  document.getElementById('downBtn').disabled=i>=state.segments.length-1;
   const vals={e_title:s.title,e_start:s.start,e_duration:s.duration,e_lead:s.lead,e_pillar:s.pillar,e_type:s.type,e_level:s.level,e_goal:s.goal,e_prompt:s.prompt,e_a:s.speakerA,e_b:s.speakerB,e_takeaway:s.takeaway,e_slides:s.slides,e_thumbs:(s.thumbs||[]).join(',')};
   for(const [id,val] of Object.entries(vals)) document.getElementById(id).value=val;
 }
@@ -875,7 +896,7 @@ function deleteSelected(){
   if(!confirm('この区間を削除しますか？')) return;
   state.segments.splice(i,1);
   state.selectedId=state.segments[i]?.id || state.segments[i-1]?.id || null;
-  autoSchedule(); render();
+  autoSchedule(); render(); closeEditModal(false);
 }
 function duplicate(id){
   const i=state.segments.findIndex(x=>x.id===id); if(i<0) return;
@@ -885,12 +906,12 @@ function duplicate(id){
 }
 function addSegment(){
   const s=seg({title:'追加区間', start:elapsedMinutes(), duration:10, prompt:'この区間で何を問い、どちらの講師に何を答えてもらうかを設定してください。'});
-  state.segments.push(s); state.selectedId=s.id; render();
+  state.segments.push(s); openEditModal(s.id,document.getElementById('addSegBtn'));
 }
 
 function exportJson(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v59.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v510.json'; a.click(); URL.revokeObjectURL(a.href);
 }
 function importJson(file){
   const r=new FileReader();
@@ -948,10 +969,36 @@ function openThumb(key){
   document.getElementById('modalNote').textContent=a.note||'';
   document.getElementById('modal').classList.add('open');
   document.getElementById('modal').setAttribute('aria-hidden','false');
+  syncModalLock();
 }
 function closeModal(){
   document.getElementById('modal').classList.remove('open');
   document.getElementById('modal').setAttribute('aria-hidden','true');
+  syncModalLock();
+}
+
+let editReturnTarget='';
+function syncModalLock(){
+  document.body.classList.toggle('modal-open',!!document.querySelector('.modal.open'));
+}
+function openEditModal(id,trigger){
+  if(!state.segments.some(x=>x.id===id)) return;
+  state.selectedId=id;
+  editReturnTarget=trigger?.id ? `#${trigger.id}` : `[data-select="${id}"]`;
+  render();
+  const modal=document.getElementById('editModal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden','false');
+  syncModalLock();
+  requestAnimationFrame(()=>{ document.getElementById('e_title').focus(); });
+}
+function closeEditModal(restoreFocus=true){
+  const modal=document.getElementById('editModal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden','true');
+  syncModalLock();
+  if(restoreFocus && editReturnTarget) document.querySelector(editReturnTarget)?.focus();
+  editReturnTarget='';
 }
 
 function fillSelect(id, list){ document.getElementById(id).innerHTML=list.map(x=>`<option value="${x.value}">${x.label}</option>`).join(''); }
@@ -959,13 +1006,32 @@ fillSelect('e_lead',leads); fillSelect('e_pillar',pillarOptions); fillSelect('e_
 
 document.addEventListener('click', e=>{
   const t=e.target.closest('[data-thumb]'); if(t) openThumb(t.dataset.thumb);
-  const s=e.target.closest('[data-select]'); if(s){ state.selectedId=s.dataset.select; render(); }
+  const s=e.target.closest('[data-select]'); if(s) openEditModal(s.dataset.select,s);
   const d=e.target.closest('[data-dup]'); if(d) duplicate(d.dataset.dup);
   const tmpl=e.target.closest('[data-template]'); if(tmpl) setTemplate(tmpl.dataset.template);
   const tab=e.target.closest('[data-view]'); if(tab) showView(tab.dataset.view);
 });
+document.addEventListener('dblclick',e=>{
+  const title=e.target.closest('[data-edit-title]');
+  if(title) openEditModal(title.dataset.editTitle,title);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(document.getElementById('editModal').classList.contains('open')) closeEditModal();
+    else if(document.getElementById('modal').classList.contains('open')) closeModal();
+    return;
+  }
+  const title=e.target.closest?.('[data-edit-title]');
+  if(title && (e.key==='Enter'||e.key===' ')){
+    e.preventDefault();
+    openEditModal(title.dataset.editTitle,title);
+  }
+});
 document.getElementById('modalClose').onclick=closeModal;
 document.getElementById('modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
+document.getElementById('editModalClose').onclick=()=>closeEditModal();
+document.getElementById('editModalDone').onclick=()=>closeEditModal();
+document.getElementById('editModal').addEventListener('click',e=>{ if(e.target.id==='editModal') closeEditModal(); });
 document.getElementById('addSegBtn').onclick=addSegment;
 document.getElementById('autoBtn').onclick=()=>{autoSchedule();render();};
 document.getElementById('exportBtn').onclick=exportJson;
