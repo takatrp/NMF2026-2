@@ -55,9 +55,26 @@ test("cloud UI includes auth, plans, sharing, and conflict recovery", () => {
   }
 });
 
+test("card edits stay in a draft until the completion button is pressed", () => {
+  assert.match(html, /let editDraft=null/);
+  assert.match(html, /function updateEditDraft\(/);
+  assert.match(html, /function commitEditModal\(/);
+  assert.match(html, /editModalDone'\)\.onclick=commitEditModal/);
+  assert.doesNotMatch(html, /addEventListener\('input',e=>updateSelected/);
+});
+
+test("cloud plans reopen from the URL and refresh only when local work is clean", () => {
+  assert.match(cloud, /getOwnedPlanIdFromUrl/);
+  assert.match(cloud, /searchParams\.set\("plan", planId\)/);
+  assert.match(cloud, /refreshLatestWhenSafe/);
+  assert.match(cloud, /window\.hasPendingCardEdit/);
+  assert.match(cloud, /payloadSignature\(\) !== cloud\.lastSavedSignature/);
+  assert.match(html, /function cloudStatePayload\(\)/);
+});
+
 test("snapshot sharing and JSON fallback remain available", () => {
   assert.ok(html.includes("スナップショット共有"));
   assert.ok(html.includes("JSON保存"));
   assert.ok(html.includes("JSON読込"));
-  assert.ok(html.includes("nmf_session_plan_v511_cloud.json"));
+  assert.ok(html.includes("nmf_session_plan_v512_live.json"));
 });

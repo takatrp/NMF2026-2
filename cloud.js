@@ -3,6 +3,7 @@
 
   const CURRENT_PLAN_KEY = "nmf2026-2.cloud.current.v1";
   const AUTOSAVE_DELAY = 1400;
+  const REFRESH_INTERVAL = 15000;
   const config = window.NMF_SUPABASE_CONFIG || {};
   const cloud = {
     client: null,
@@ -11,6 +12,7 @@
     saveTimer: null,
     suppressAutosave: true,
     saving: false,
+    refreshing: false,
     conflict: false,
     status: "クラウドを準備中",
     statusKind: "idle",
@@ -18,7 +20,8 @@
   };
 
   const byId = (id) => document.getElementById(id);
-  const payloadSignature = () => JSON.stringify(statePayload());
+  const cloudPayload = () => window.cloudStatePayload?.() || statePayload();
+  const payloadSignature = () => JSON.stringify(cloudPayload());
   const firstRow = (data) => Array.isArray(data) ? data[0] : data;
 
   function setMessage(id, text, kind) {
@@ -69,15 +72,17 @@
     byId("cloudSignedIn").classList.toggle("hidden", !signedIn);
     byId("cloudAccountEmail").textContent = cloud.session?.user?.email || "";
 
+    const targetLoading = !!(getShareTokenFromUrl() || getOwnedPlanIdFromUrl()) && !cloud.current;
     const readOnly = cloud.current?.access === "viewer";
     document.body.classList.toggle("cloud-readonly", !!readOnly);
+    document.body.classList.toggle("cloud-target-loading", targetLoading);
     [
       ...document.querySelectorAll("[data-select],[data-dup],[data-template]"),
       byId("addSegBtn"),
       byId("autoBtn"),
       byId("importBtn")
     ].filter(Boolean).forEach((el) => {
-      el.disabled = !!readOnly;
+      el.disabled = !!readOnly || targetLoading;
     });
   }
 
@@ -111,6 +116,13 @@
     return new URL(location.href).searchParams.get("share") || "";
   }
 
+  function getOwnedPlanIdFromUrl() {
+    const value = new URL(location.href).searchParams.get("plan") || "";
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+      ? value
+      : "";
+  }
+
   function buildCloudShareUrl(token) {
     const url = new URL(location.href);
     url.search = "";
@@ -119,10 +131,19 @@
     return url.toString();
   }
 
-  function clearShareParam() {
+  function setOwnedPlanParam(planId) {
     const url = new URL(location.href);
-    if (!url.searchParams.has("share")) return;
-    url.searchParams.delete("share");
+    url.search = "";
+    url.hash = "";
+    if (planId) url.searchParams.set("plan", planId);
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+
+  function setSharedPlanParam(token) {
+    const url = new URL(location.href);
+    url.search = "";
+    url.hash = "";
+    if (token) url.searchParams.set("share", token);
     history.replaceState(null, "", url.pathname + url.search + url.hash);
   }
 
@@ -162,9 +183,12 @@
 
   function applyCloudPlan(row, access, shareToken) {
     cloud.suppressAutosave = true;
-    applyStatePayload(row.payload);
+    if (window.applyCloudStatePayload) window.applyCloudStatePayload(row.payload);
+    else applyStatePayload(row.payload);
     render();
     cloud.current = normalizePlan(row, access, shareToken);
+    if (access === "owner") setOwnedPlanParam(row.id);
+    else setSharedPlanParam(shareToken);
     cloud.lastSavedSignature = payloadSignature();
     cloud.conflict = false;
     persistCurrent();
@@ -172,11 +196,12 @@
     setStatus(access === "viewer" ? "閲覧のみ" : `保存済み ${formatUpdatedAt(row.updated_at)}`, "ok");
   }
 
-  function clearCurrentPlan() {
+  function clearCurrentPlan(clearUrl) {
     cloud.current = null;
     cloud.lastSavedSignature = "";
     cloud.conflict = false;
     persistCurrent();
+    if (clearUrl) setOwnedPlanParam("");
     document.body.classList.remove("cloud-readonly");
     setStatus(cloud.session ? "ローカル編集中" : "未ログイン", cloud.session ? "ok" : "idle");
   }
@@ -285,7 +310,7 @@
     cloud.saving = true;
     renderCloudUi();
     setMessage("cloudPlansMessage", "クラウドへ保存しています。", "warn");
-    const payload = statePayload();
+    const payload = cloudPayload();
     const { data, error } = await cloud.client.rpc("save_owned_seminar_plan", {
       p_plan_id: null,
       p_title: title,
@@ -299,8 +324,8 @@
       renderCloudUi();
       return;
     }
-    clearShareParam();
     cloud.current = normalizePlan(row, "owner", "");
+    setOwnedPlanParam(row.id);
     cloud.lastSavedSignature = JSON.stringify(payload);
     cloud.conflict = false;
     persistCurrent();
@@ -320,7 +345,6 @@
       handleCloudError(error, "設計を読み込めません");
       return false;
     }
-    clearShareParam();
     applyCloudPlan(data, "owner", "");
     if (closeList) closeCloudModal("cloudPlansModal");
     return true;
@@ -348,7 +372,7 @@
       setMessage("cloudPlansMessage", `削除できません：${error.message}`, "bad");
       return;
     }
-    if (cloud.current?.id === planId) clearCurrentPlan();
+    if (cloud.current?.id === planId) clearCurrentPlan(true);
     await listOwnedPlans();
   }
 
@@ -368,7 +392,7 @@
     }
     if (!isEditable() || cloud.saving || cloud.conflict) return false;
 
-    const payload = statePayload();
+    const payload = cloudPayload();
     const signature = JSON.stringify(payload);
     if (!manual && signature === cloud.lastSavedSignature) return true;
 
@@ -429,6 +453,49 @@
     cloud.saveTimer = setTimeout(() => saveCloudPlan({ manual: false }), AUTOSAVE_DELAY);
   };
 
+  async function refreshLatestWhenSafe() {
+    if (
+      !cloud.session ||
+      !cloud.current ||
+      cloud.saving ||
+      cloud.refreshing ||
+      cloud.conflict ||
+      document.visibilityState === "hidden" ||
+      window.hasPendingCardEdit?.() ||
+      payloadSignature() !== cloud.lastSavedSignature
+    ) {
+      return false;
+    }
+
+    cloud.refreshing = true;
+    let data;
+    let error;
+    if (cloud.current.access === "owner") {
+      ({ data, error } = await cloud.client
+        .from("seminar_plans")
+        .select("id,title,payload,revision,view_token,edit_token,updated_at")
+        .eq("id", cloud.current.id)
+        .single());
+    } else {
+      ({ data, error } = await cloud.client.rpc("load_shared_seminar_plan", {
+        p_token: cloud.current.shareToken
+      }));
+      data = firstRow(data);
+    }
+    cloud.refreshing = false;
+
+    if (error) {
+      console.warn("最新版を確認できませんでした", error);
+      return false;
+    }
+    const row = firstRow(data);
+    if (!row || Number(row.revision) <= cloud.current.revision) return true;
+
+    applyCloudPlan(row, cloud.current.access, cloud.current.shareToken);
+    setStatus(`最新版を反映 ${formatUpdatedAt(row.updated_at)}`, "ok");
+    return true;
+  }
+
   async function reloadCurrentPlan() {
     if (!cloud.current) return;
     const ok = cloud.current.access === "owner"
@@ -482,6 +549,10 @@
       cloud.suppressAutosave = true;
       clearCurrentPlan();
       cloud.suppressAutosave = false;
+      if (getShareTokenFromUrl() || getOwnedPlanIdFromUrl()) {
+        setStatus("クラウド設計を開くにはログイン", "error");
+        openCloudModal("cloudAuthModal");
+      }
       renderCloudUi();
       return;
     }
@@ -491,6 +562,11 @@
     const urlToken = getShareTokenFromUrl();
     if (urlToken) {
       await loadSharedPlan(urlToken, false);
+      return;
+    }
+    const urlPlanId = getOwnedPlanIdFromUrl();
+    if (urlPlanId) {
+      await loadOwnedPlan(urlPlanId, false);
       return;
     }
 
@@ -533,6 +609,10 @@
       if (event.key === "Escape") closeTopCloudModal();
       if (event.key === "Enter" && event.target.id === "cloudEmail") sendLoginLink();
     });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") refreshLatestWhenSafe();
+    });
+    window.addEventListener("focus", refreshLatestWhenSafe);
   }
 
   async function init() {
@@ -562,10 +642,11 @@
     cloud.client.auth.onAuthStateChange((_event, session) => {
       setTimeout(() => handleSession(session), 0);
     });
+    window.setInterval(refreshLatestWhenSafe, REFRESH_INTERVAL);
     cloud.suppressAutosave = false;
 
-    if (!cloud.session && getShareTokenFromUrl()) {
-      setStatus("共有設計を開くにはログイン", "error");
+    if (!cloud.session && (getShareTokenFromUrl() || getOwnedPlanIdFromUrl())) {
+      setStatus("クラウド設計を開くにはログイン", "error");
       openCloudModal("cloudAuthModal");
     } else if (!cloud.session) {
       setStatus("未ログイン", "idle");

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NMF第2分科会 135分内休憩10分設計ツール v5.11 Cloud</title>
+<title>TKCシステムで会計を未来につなぐ ～365日変動損益計算書・継続MAS・AI活用と実践｜NMF第2分科会 135分内休憩10分設計ツール v5.12 Live</title>
 <style>
   :root {
     --bg:#f4f7fb;
@@ -208,7 +208,8 @@
   .share-row label{font-size:12px;font-weight:900;color:var(--muted)}
   .share-row input{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:#f8fafc}
   .share-row button{font-size:12px;padding:6px 8px;border-radius:7px}
-  body.cloud-readonly [data-select],body.cloud-readonly [data-dup],body.cloud-readonly [data-template],body.cloud-readonly #addSegBtn,body.cloud-readonly #autoBtn,body.cloud-readonly #importBtn{pointer-events:none;opacity:.42}
+  body.cloud-readonly [data-select],body.cloud-readonly [data-dup],body.cloud-readonly [data-template],body.cloud-readonly #addSegBtn,body.cloud-readonly #autoBtn,body.cloud-readonly #importBtn,
+  body.cloud-target-loading [data-select],body.cloud-target-loading [data-dup],body.cloud-target-loading [data-template],body.cloud-target-loading #addSegBtn,body.cloud-target-loading #autoBtn,body.cloud-target-loading #importBtn{pointer-events:none;opacity:.42}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .tab{background:#f8fafc;border:1px solid var(--line)}
   .tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -257,7 +258,7 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>NMF第2分科会 135分内休憩10分設計ツール v5.11 Cloud</h1>
+    <h1>TKCシステムで会計を未来につなぐ ～365日変動損益計算書・継続MAS・AI活用と実践｜NMF第2分科会 135分内休憩10分設計ツール v5.12 Live</h1>
     <p>ファシリテーター（天野先生）、講師2名（大森先生・松本）の対話型進行を、TKC方式の本筋から外さず、時間配分・候補スライド・ガントチャート・台本・準拠度まで一体で設計します。</p>
     <div class="toolbar">
       <button class="btn-hero" data-template="balanced">TKC本筋テンプレート</button>
@@ -900,12 +901,13 @@ function renderAgenda(){
 }
 
 function renderEditor(){
-  const s=state.segments.find(x=>x.id===state.selectedId);
+  const s=editDraft || state.segments.find(x=>x.id===state.selectedId);
   if(!s) return;
-  const i=state.segments.findIndex(x=>x.id===s.id);
+  const i=editDraft ? editDraftIndex : state.segments.findIndex(x=>x.id===s.id);
   document.getElementById('editModalTitle').textContent=`${i+1}. ${s.title}`;
   document.getElementById('upBtn').disabled=i<=0;
-  document.getElementById('downBtn').disabled=i>=state.segments.length-1;
+  document.getElementById('downBtn').disabled=i>=(editDraftIsNew ? state.segments.length : state.segments.length-1);
+  document.getElementById('delBtn').textContent=editDraftIsNew?'追加を取消':editDraftDeleted?'削除予定を取消':'削除';
   const vals={e_title:s.title,e_start:s.start,e_duration:s.duration,e_lead:s.lead,e_pillar:s.pillar,e_type:s.type,e_level:s.level,e_goal:s.goal,e_prompt:s.prompt,e_a:s.speakerA,e_b:s.speakerB,e_takeaway:s.takeaway,e_slides:s.slides,e_thumbs:(s.thumbs||[]).join(',')};
   for(const [id,val] of Object.entries(vals)) document.getElementById(id).value=val;
 }
@@ -993,28 +995,35 @@ function showView(v){
   saveState();
 }
 
-function updateSelected(field,value){
-  const s=state.segments.find(x=>x.id===state.selectedId); if(!s) return;
-  if(field==='duration'||field==='start') s[field]=Number(value||0);
-  else if(field==='thumbs') s.thumbs=String(value||'').split(',').map(x=>x.trim()).filter(Boolean);
-  else s[field]=value;
-  if(field==='duration') autoSchedule();
-  render();
+function updateEditDraft(field,value){
+  if(!editDraft) return;
+  if(field==='duration'||field==='start') editDraft[field]=Number(value||0);
+  else if(field==='thumbs') editDraft.thumbs=String(value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  else editDraft[field]=value;
+  if(field==='title') document.getElementById('editModalTitle').textContent=`${editDraftIndex+1}. ${editDraft.title}`;
 }
 
-function moveSelected(delta){
-  const i=state.segments.findIndex(x=>x.id===state.selectedId), j=i+delta;
-  if(i<0||j<0||j>=state.segments.length) return;
-  [state.segments[i],state.segments[j]]=[state.segments[j],state.segments[i]];
-  autoSchedule(); render();
+function moveEditDraft(delta){
+  if(!editDraft) return;
+  const max=editDraftIsNew ? state.segments.length : state.segments.length-1;
+  const next=editDraftIndex+delta;
+  if(next<0||next>max) return;
+  editDraftIndex=next;
+  document.getElementById('editModalTitle').textContent=`${editDraftIndex+1}. ${editDraft.title}`;
+  document.getElementById('upBtn').disabled=editDraftIndex<=0;
+  document.getElementById('downBtn').disabled=editDraftIndex>=max;
 }
 function deleteSelected(){
-  const i=state.segments.findIndex(x=>x.id===state.selectedId);
-  if(i<0) return;
-  if(!confirm('この区間を削除しますか？')) return;
-  state.segments.splice(i,1);
-  state.selectedId=state.segments[i]?.id || state.segments[i-1]?.id || null;
-  autoSchedule(); render(); closeEditModal(false);
+  if(!editDraft) return;
+  if(editDraftIsNew){ closeEditModal(); return; }
+  if(editDraftDeleted){
+    editDraftDeleted=false;
+    document.getElementById('delBtn').textContent='削除';
+    return;
+  }
+  if(!confirm('この区間を削除予定にしますか？「編集を完了」で削除が確定します。')) return;
+  editDraftDeleted=true;
+  document.getElementById('delBtn').textContent='削除予定を取消';
 }
 function duplicate(id){
   const i=state.segments.findIndex(x=>x.id===id); if(i<0) return;
@@ -1024,12 +1033,12 @@ function duplicate(id){
 }
 function addSegment(){
   const s=seg({title:'追加区間', start:elapsedMinutes(), duration:10, prompt:'この区間で何を問い、どちらの講師に何を答えてもらうかを設定してください。'});
-  state.segments.push(s); openEditModal(s.id,document.getElementById('addSegBtn'));
+  beginEditDraft(s,state.segments.length,document.getElementById('addSegBtn'),true);
 }
 
 function exportJson(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v511_cloud.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v512_live.json'; a.click(); URL.revokeObjectURL(a.href);
 }
 function importJson(file){
   const r=new FileReader();
@@ -1037,6 +1046,7 @@ function importJson(file){
   r.readAsText(file,'utf-8');
 }
 function statePayload(){ return {segments:state.segments, selectedId:state.selectedId, view:state.view, candidateDeckVersion:state.candidateDeckVersion}; }
+function cloudStatePayload(){ return {segments:state.segments, candidateDeckVersion:state.candidateDeckVersion}; }
 function applyStatePayload(data){
   if(!data || !Array.isArray(data.segments)) throw new Error('segmentsなし');
   state.segments=data.segments.map(x=>seg(x));
@@ -1046,6 +1056,15 @@ function applyStatePayload(data){
   state.view=data.view||'agenda';
   autoSchedule();
 }
+function applyCloudStatePayload(data){
+  const previousSelectedId=state.selectedId;
+  const previousView=state.view;
+  applyStatePayload(data);
+  if(state.segments.some(x=>x.id===previousSelectedId)) state.selectedId=previousSelectedId;
+  state.view=previousView||'agenda';
+}
+window.cloudStatePayload=cloudStatePayload;
+window.applyCloudStatePayload=applyCloudStatePayload;
 function base64UrlEncode(text){
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -1061,6 +1080,7 @@ function base64UrlDecode(text){
 }
 function buildShareUrl(){
   const url = new URL(location.href);
+  url.search = '';
   url.hash = 'plan=' + base64UrlEncode(JSON.stringify(statePayload()));
   return url.toString();
 }
@@ -1098,28 +1118,78 @@ function closeModal(){
 }
 
 let editReturnTarget='';
+let editDraft=null;
+let editDraftIndex=-1;
+let editDraftIsNew=false;
+let editDraftDeleted=false;
 function syncModalLock(){
   document.body.classList.toggle('modal-open',!!document.querySelector('.modal.open'));
 }
-function openEditModal(id,trigger){
-  if(!state.segments.some(x=>x.id===id)) return;
-  state.selectedId=id;
-  editReturnTarget=trigger?.id ? `#${trigger.id}` : `[data-select="${id}"]`;
-  render();
+function cloneEditSegment(source){
+  return Object.assign({},source,{thumbs:[...(source.thumbs||[])]});
+}
+function beginEditDraft(source,index,trigger,isNew=false){
+  editDraft=cloneEditSegment(source);
+  editDraftIndex=index;
+  editDraftIsNew=isNew;
+  editDraftDeleted=false;
+  editReturnTarget=trigger?.id ? `#${trigger.id}` : `[data-select="${source.id}"]`;
+  renderEditor();
   const modal=document.getElementById('editModal');
   modal.classList.add('open');
   modal.setAttribute('aria-hidden','false');
   syncModalLock();
   requestAnimationFrame(()=>{ document.getElementById('e_title').focus(); });
 }
-function closeEditModal(restoreFocus=true){
+function openEditModal(id,trigger){
+  const index=state.segments.findIndex(x=>x.id===id);
+  if(index<0) return;
+  beginEditDraft(state.segments[index],index,trigger,false);
+}
+function clearEditDraft(){
+  editDraft=null;
+  editDraftIndex=-1;
+  editDraftIsNew=false;
+  editDraftDeleted=false;
+}
+function commitEditModal(){
+  if(!editDraft){ closeEditModal(); return; }
+  const committed=cloneEditSegment(editDraft);
+  committed.start=Number(committed.start||0);
+  committed.duration=Math.max(1,Number(committed.duration||1));
+  const wasNew=editDraftIsNew;
+  const originalIndex=wasNew ? -1 : state.segments.findIndex(x=>x.id===committed.id);
+  if(!wasNew && originalIndex<0){ closeEditModal(); return; }
+  if(editDraftDeleted){
+    state.segments.splice(originalIndex,1);
+    state.selectedId=state.segments[originalIndex]?.id || state.segments[originalIndex-1]?.id || null;
+    clearEditDraft();
+    closeEditModal(false,false);
+    autoSchedule();
+    render();
+    return;
+  }
+  const previous=wasNew ? null : state.segments[originalIndex];
+  if(!wasNew) state.segments.splice(originalIndex,1);
+  const targetIndex=Math.max(0,Math.min(editDraftIndex,state.segments.length));
+  state.segments.splice(targetIndex,0,committed);
+  state.selectedId=committed.id;
+  const needsSchedule=wasNew || originalIndex!==targetIndex || Number(previous?.duration)!==committed.duration;
+  clearEditDraft();
+  closeEditModal(false,false);
+  if(needsSchedule) autoSchedule();
+  render();
+}
+function closeEditModal(restoreFocus=true,discard=true){
   const modal=document.getElementById('editModal');
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden','true');
   syncModalLock();
   if(restoreFocus && editReturnTarget) document.querySelector(editReturnTarget)?.focus();
   editReturnTarget='';
+  if(discard) clearEditDraft();
 }
+window.hasPendingCardEdit=()=>!!editDraft;
 
 function fillSelect(id, list){ document.getElementById(id).innerHTML=list.map(x=>`<option value="${x.value}">${x.label}</option>`).join(''); }
 fillSelect('e_lead',leads); fillSelect('e_pillar',pillarOptions); fillSelect('e_type',types); fillSelect('e_level',levels);
@@ -1150,7 +1220,7 @@ document.addEventListener('keydown',e=>{
 document.getElementById('modalClose').onclick=closeModal;
 document.getElementById('modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
 document.getElementById('editModalClose').onclick=()=>closeEditModal();
-document.getElementById('editModalDone').onclick=()=>closeEditModal();
+document.getElementById('editModalDone').onclick=commitEditModal;
 document.getElementById('editModal').addEventListener('click',e=>{ if(e.target.id==='editModal') closeEditModal(); });
 document.getElementById('addSegBtn').onclick=addSegment;
 document.getElementById('autoBtn').onclick=()=>{autoSchedule();render();};
@@ -1158,8 +1228,8 @@ document.getElementById('exportBtn').onclick=exportJson;
 document.getElementById('importBtn').onclick=()=>document.getElementById('jsonInput').click();
 document.getElementById('shareLinkBtn').onclick=copyShareLink;
 document.getElementById('jsonInput').onchange=e=>{ if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=''; };
-document.getElementById('upBtn').onclick=()=>moveSelected(-1);
-document.getElementById('downBtn').onclick=()=>moveSelected(1);
+document.getElementById('upBtn').onclick=()=>moveEditDraft(-1);
+document.getElementById('downBtn').onclick=()=>moveEditDraft(1);
 document.getElementById('delBtn').onclick=deleteSelected;
 document.getElementById('renderScriptBtn').onclick=renderScript;
 document.getElementById('copyScriptBtn').onclick=()=>copyText(buildScriptText());
@@ -1169,10 +1239,12 @@ document.getElementById('copyGanttBtn').onclick=copyGantt;
 [
  ['e_title','title'],['e_start','start'],['e_duration','duration'],['e_lead','lead'],['e_pillar','pillar'],['e_type','type'],['e_level','level'],
  ['e_goal','goal'],['e_prompt','prompt'],['e_a','speakerA'],['e_b','speakerB'],['e_takeaway','takeaway'],['e_slides','slides'],['e_thumbs','thumbs']
-].forEach(([id,field])=>document.getElementById(id).addEventListener('input',e=>updateSelected(field,e.target.value)));
+].forEach(([id,field])=>document.getElementById(id).addEventListener('input',e=>updateEditDraft(field,e.target.value)));
 
 isBooting = false;
-if(loadShareFromUrl() || loadSavedState()) render();
+const initialCloudTarget=new URL(location.href).searchParams.has('share')||new URL(location.href).searchParams.has('plan');
+if(initialCloudTarget) document.body.classList.add('cloud-target-loading');
+if((!initialCloudTarget&&loadShareFromUrl()) || loadSavedState()) render();
 else setTemplate('balanced');
 saveState();
 </script>
