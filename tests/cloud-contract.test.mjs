@@ -103,22 +103,14 @@ test("the progress script exports a speaker-by-speaker Excel workbook", () => {
   assert.match(html, /function buildScriptWorkbookRows\(/);
   assert.match(html, /\['パート（タイトル・時間）','天野先生','大森先生','松本'\]/);
   assert.match(html, /return \[part,s\.prompt\|\|'',s\.speakerB\|\|'',s\.speakerA\|\|''\]/);
-  assert.match(html, /function finalizeScriptWorkbook\(/);
-  assert.match(html, /orientation="landscape"/);
-  assert.match(html, /fitToWidth="1"/);
-  assert.match(html, /wrapText="1"/);
+  assert.match(html, /const blob=new Blob\(\[workbookData\]/);
+  assert.match(html, /document\.body\.appendChild\(link\)/);
+  assert.match(html, /setTimeout\(\(\)=>URL\.revokeObjectURL\(downloadUrl\),1000\)/);
+  assert.match(html, /Excelファイルを保存できませんでした/);
   assert.ok(html.includes("NMF第2分科会_進行台本.xlsx"));
 });
 
-test("the Excel workbook keeps its rows and print settings", () => {
-  const source = html.match(
-    /function finalizeScriptWorkbook\(workbookData\)\{[\s\S]*?\n\}\n\nfunction downloadScriptExcel/
-  )?.[0].replace(/\n\nfunction downloadScriptExcel$/, "") || "";
-  assert.ok(source);
-  const finalizeScriptWorkbook = new Function(
-    "XLSX",
-    `${source}; return finalizeScriptWorkbook;`
-  )(XLSX);
+test("the Excel workbook keeps its speaker-by-speaker rows", () => {
   const rows = [
     ["パート（タイトル・時間）", "天野先生", "大森先生", "松本"],
     ["1. テスト\n0〜10分（10分）", "問い", "大森先生の内容", "松本の内容"]
@@ -126,19 +118,7 @@ test("the Excel workbook keeps its rows and print settings", () => {
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "進行台本");
-  const raw = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-  const output = finalizeScriptWorkbook(raw);
-  const archive = XLSX.CFB.read(output, { type: "array" });
-  const sheetXml = Buffer.from(
-    XLSX.CFB.find(archive, "Root Entry/xl/worksheets/sheet1.xml").content
-  ).toString("utf8");
-  const stylesXml = Buffer.from(
-    XLSX.CFB.find(archive, "Root Entry/xl/styles.xml").content
-  ).toString("utf8");
-  assert.match(sheetXml, /orientation="landscape"/);
-  assert.match(sheetXml, /fitToWidth="1"/);
-  assert.match(sheetXml, /<c s="1" r="A1"/);
-  assert.match(stylesXml, /wrapText="1"/);
+  const output = XLSX.write(workbook, { bookType: "xlsx", type: "array", compression: true });
   const reopened = XLSX.read(output, { type: "array" });
   assert.deepEqual(
     XLSX.utils.sheet_to_json(reopened.Sheets["進行台本"], { header: 1 }),
@@ -150,5 +130,5 @@ test("snapshot sharing and JSON fallback remain available", () => {
   assert.ok(html.includes("スナップショット共有"));
   assert.ok(html.includes("JSON保存"));
   assert.ok(html.includes("JSON読込"));
-  assert.ok(html.includes("nmf_session_plan_v514_live.json"));
+  assert.ok(html.includes("nmf_session_plan_v515_live.json"));
 });
