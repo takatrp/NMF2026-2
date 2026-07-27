@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NMF第2分科会 135分内休憩10分設計ツール v5.10</title>
+<title>NMF第2分科会 135分内休憩10分設計ツール v5.11 Cloud</title>
 <style>
   :root {
     --bg:#f4f7fb;
@@ -60,6 +60,7 @@
     transition:.15s ease;
   }
   button:hover{transform:translateY(-1px)}
+  button:disabled{cursor:not-allowed;opacity:.52;transform:none}
   .btn-hero{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#fff;font-size:12px;padding:5px 8px}
   .btn-primary{background:var(--blue);color:#fff}
   .btn-dark{background:var(--navy);color:#fff}
@@ -183,6 +184,31 @@
   .edit-modal-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:#f8fafc}
   .edit-modal-foot .actions{margin-top:0}
   body.modal-open{overflow:hidden}
+  .cloud-bar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:-4px 0 10px;padding:7px 10px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 5px 18px rgba(15,23,42,.06)}
+  .cloud-summary{display:flex;align-items:center;gap:7px;min-width:0;font-size:12px}
+  .cloud-dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;box-shadow:0 0 0 3px #e2e8f0;flex:0 0 auto}
+  .cloud-dot.online{background:var(--green);box-shadow:0 0 0 3px var(--green2)}
+  .cloud-dot.saving{background:var(--amber);box-shadow:0 0 0 3px var(--amber2)}
+  .cloud-dot.error{background:var(--red);box-shadow:0 0 0 3px var(--red2)}
+  .cloud-status{font-weight:900;white-space:nowrap}
+  .cloud-plan{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cloud-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .cloud-actions button{padding:5px 8px;font-size:12px;border-radius:7px}
+  .cloud-modal-card{width:min(94vw,680px);max-height:90vh;overflow:hidden;display:flex;flex-direction:column}
+  .cloud-modal-body{padding:14px 16px;overflow:auto}
+  .cloud-modal-body .banner{font-size:12px}
+  .cloud-account{font-size:13px;font-weight:800;margin-bottom:10px}
+  .cloud-list{border-top:1px solid var(--line);margin-top:12px}
+  .cloud-plan-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
+  .cloud-plan-row strong{display:block;font-size:13px;line-height:1.4}
+  .cloud-plan-meta{font-size:11px;color:var(--muted);margin-top:2px}
+  .cloud-plan-actions{display:flex;gap:6px}
+  .cloud-plan-actions button{font-size:12px;padding:5px 8px;border-radius:7px}
+  .share-row{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:8px;align-items:center;margin-bottom:10px}
+  .share-row label{font-size:12px;font-weight:900;color:var(--muted)}
+  .share-row input{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:#f8fafc}
+  .share-row button{font-size:12px;padding:6px 8px;border-radius:7px}
+  body.cloud-readonly [data-select],body.cloud-readonly [data-dup],body.cloud-readonly [data-template],body.cloud-readonly #addSegBtn,body.cloud-readonly #autoBtn,body.cloud-readonly #importBtn{pointer-events:none;opacity:.42}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .tab{background:#f8fafc;border:1px solid var(--line)}
   .tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -213,9 +239,14 @@
     .edit-modal-foot{align-items:stretch;flex-direction:column-reverse;padding:10px 12px}
     .edit-modal-foot .actions{width:100%}
     .edit-modal-foot button{flex:1}
+    .cloud-bar{align-items:stretch;flex-direction:column}
+    .cloud-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+    .cloud-actions button{width:100%}
+    .share-row{grid-template-columns:1fr auto}
+    .share-row label{grid-column:1/-1}
   }
   @media print{
-    .hero .toolbar,.right-panel,.actions,.tabs,.no-print{display:none!important}
+    .hero .toolbar,.cloud-bar,.right-panel,.actions,.tabs,.no-print{display:none!important}
     body{background:#fff}
     .layout{display:block}
     .panel,.hero{box-shadow:none}
@@ -226,7 +257,7 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>NMF第2分科会 135分内休憩10分設計ツール v5.10</h1>
+    <h1>NMF第2分科会 135分内休憩10分設計ツール v5.11 Cloud</h1>
     <p>ファシリテーター（天野先生）、講師2名（大森先生・松本）の対話型進行を、TKC方式の本筋から外さず、時間配分・候補スライド・ガントチャート・台本・準拠度まで一体で設計します。</p>
     <div class="toolbar">
       <button class="btn-hero" data-template="balanced">TKC本筋テンプレート</button>
@@ -236,8 +267,23 @@
       <button class="btn-hero" id="autoBtn">開始時刻を再計算</button>
       <button class="btn-hero" id="exportBtn">JSON保存</button>
       <button class="btn-hero" id="importBtn">JSON読込</button>
-      <button class="btn-hero" id="shareLinkBtn">共有リンクコピー</button>
+      <button class="btn-hero" id="shareLinkBtn">スナップショット共有</button>
       <button class="btn-hero" onclick="window.print()">印刷</button>
+    </div>
+  </section>
+
+  <section class="cloud-bar no-print" aria-label="クラウド保存">
+    <div class="cloud-summary">
+      <span class="cloud-dot" id="cloudDot"></span>
+      <span class="cloud-status" id="cloudStatus">クラウドを準備中</span>
+      <span class="cloud-plan" id="cloudPlanLabel"></span>
+    </div>
+    <div class="cloud-actions">
+      <button class="btn-soft" id="cloudAccountBtn">ログイン</button>
+      <button class="btn-primary" id="cloudSaveBtn" disabled>クラウド保存</button>
+      <button class="btn-soft" id="cloudPlansBtn" disabled>設計一覧</button>
+      <button class="btn-soft" id="cloudShareBtn" disabled>共有</button>
+      <button class="btn-danger hidden" id="cloudReloadBtn">最新を再読込</button>
     </div>
   </section>
 
@@ -366,6 +412,77 @@
         <button class="btn-danger" id="delBtn">削除</button>
       </div>
       <button class="btn-primary" id="editModalDone">編集を完了</button>
+    </div>
+  </div>
+</div>
+
+<div id="cloudAuthModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cloudAuthTitle" aria-hidden="true">
+  <div class="modal-card cloud-modal-card">
+    <div class="modal-head">
+      <strong id="cloudAuthTitle">クラウドへログイン</strong>
+      <button class="btn-soft" data-cloud-close="cloudAuthModal">閉じる</button>
+    </div>
+    <div class="cloud-modal-body">
+      <div id="cloudSignedOut">
+        <div class="field">
+          <label for="cloudEmail">メールアドレス</label>
+          <input id="cloudEmail" type="email" autocomplete="email" placeholder="name@example.com">
+        </div>
+        <button class="btn-primary" id="cloudSendLinkBtn">ログインリンクを送信</button>
+      </div>
+      <div id="cloudSignedIn" class="hidden">
+        <div class="cloud-account" id="cloudAccountEmail"></div>
+        <button class="btn-soft" id="cloudSignOutBtn">ログアウト</button>
+      </div>
+      <div id="cloudAuthMessage" class="banner warn hidden"></div>
+    </div>
+  </div>
+</div>
+
+<div id="cloudPlansModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cloudPlansTitle" aria-hidden="true">
+  <div class="modal-card cloud-modal-card">
+    <div class="modal-head">
+      <strong id="cloudPlansTitle">クラウド設計一覧</strong>
+      <button class="btn-soft" data-cloud-close="cloudPlansModal">閉じる</button>
+    </div>
+    <div class="cloud-modal-body">
+      <div class="row2">
+        <div class="field" style="margin-bottom:0">
+          <label for="cloudNewPlanName">新しい設計名</label>
+          <input id="cloudNewPlanName" maxlength="120" value="NMF第2分科会 135分設計">
+        </div>
+        <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0">
+          <button class="btn-primary" id="cloudCreateBtn" style="width:100%">現在の内容を新規保存</button>
+        </div>
+      </div>
+      <div id="cloudPlansMessage" class="banner warn hidden"></div>
+      <div id="cloudPlanList" class="cloud-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="cloudShareModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cloudShareTitle" aria-hidden="true">
+  <div class="modal-card cloud-modal-card">
+    <div class="modal-head">
+      <strong id="cloudShareTitle">共有リンク</strong>
+      <button class="btn-soft" data-cloud-close="cloudShareModal">閉じる</button>
+    </div>
+    <div class="cloud-modal-body">
+      <p class="small">リンクを受け取った人も、メールログイン後に設計を開きます。</p>
+      <div class="share-row">
+        <label for="cloudViewLink">閲覧のみ</label>
+        <input id="cloudViewLink" readonly>
+        <button class="btn-soft" data-copy-cloud="view">コピー</button>
+      </div>
+      <div class="share-row">
+        <label for="cloudEditLink">編集可能</label>
+        <input id="cloudEditLink" readonly>
+        <button class="btn-soft" data-copy-cloud="edit">コピー</button>
+      </div>
+      <div id="cloudShareMessage" class="banner warn hidden"></div>
+      <div class="actions">
+        <button class="btn-danger" id="cloudRotateLinksBtn">共有リンクを再発行</button>
+      </div>
     </div>
   </div>
 </div>
@@ -651,6 +768,7 @@ function timeAssessment(){
 function saveState(){
   if(isBooting) return;
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({segments:state.segments, selectedId:state.selectedId, view:state.view, candidateDeckVersion:state.candidateDeckVersion})); }catch(e){}
+  if(typeof window.scheduleCloudAutosave==='function') window.scheduleCloudAutosave();
 }
 function loadSavedState(){
   try{
@@ -911,14 +1029,23 @@ function addSegment(){
 
 function exportJson(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v510.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v511_cloud.json'; a.click(); URL.revokeObjectURL(a.href);
 }
 function importJson(file){
   const r=new FileReader();
-  r.onload=()=>{ try{ const data=JSON.parse(r.result); if(!Array.isArray(data.segments)) throw new Error('segmentsなし'); state.segments=data.segments.map(x=>seg(x)); upgradePdfCandidates(state.segments,data.candidateDeckVersion); state.candidateDeckVersion=CANDIDATE_DECK_VERSION; state.selectedId=data.selectedId||state.segments[0]?.id||null; render(); }catch(e){ alert('JSONを読み込めませんでした。'); } };
+  r.onload=()=>{ try{ applyStatePayload(JSON.parse(r.result)); render(); }catch(e){ alert('JSONを読み込めませんでした。'); } };
   r.readAsText(file,'utf-8');
 }
 function statePayload(){ return {segments:state.segments, selectedId:state.selectedId, view:state.view, candidateDeckVersion:state.candidateDeckVersion}; }
+function applyStatePayload(data){
+  if(!data || !Array.isArray(data.segments)) throw new Error('segmentsなし');
+  state.segments=data.segments.map(x=>seg(x));
+  upgradePdfCandidates(state.segments,data.candidateDeckVersion);
+  state.candidateDeckVersion=CANDIDATE_DECK_VERSION;
+  state.selectedId=data.selectedId||state.segments[0]?.id||null;
+  state.view=data.view||'agenda';
+  autoSchedule();
+}
 function base64UrlEncode(text){
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -943,14 +1070,7 @@ function loadShareFromUrl(){
   const raw = params.get('plan');
   if(!raw) return false;
   try{
-    const data = JSON.parse(base64UrlDecode(raw));
-    if(!Array.isArray(data.segments)) throw new Error('segmentsなし');
-    state.segments = data.segments.map(x=>seg(x));
-    upgradePdfCandidates(state.segments,data.candidateDeckVersion);
-    state.candidateDeckVersion=CANDIDATE_DECK_VERSION;
-    state.selectedId = data.selectedId || state.segments[0]?.id || null;
-    state.view = data.view || 'agenda';
-    autoSchedule();
+    applyStatePayload(JSON.parse(base64UrlDecode(raw)));
     if(typeof history !== 'undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
     return true;
   }catch(e){
@@ -1056,5 +1176,8 @@ if(loadShareFromUrl() || loadSavedState()) render();
 else setTemplate('balanced');
 saveState();
 </script>
+<script src="./supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./cloud.js"></script>
 </body>
 </html>
