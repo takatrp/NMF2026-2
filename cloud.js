@@ -9,6 +9,7 @@
     client: null,
     session: null,
     current: null,
+    publicPlanId: "",
     saveTimer: null,
     suppressAutosave: true,
     saving: false,
@@ -64,16 +65,26 @@
     byId("cloudStatus").textContent = cloud.status;
     byId("cloudPlanLabel").textContent = cloud.current ? `｜${cloud.current.title}` : "";
     byId("cloudAccountBtn").textContent = signedIn ? "アカウント" : "ログイン";
-    byId("cloudSaveBtn").disabled = !signedIn || cloud.saving || cloud.conflict || (cloud.current?.access === "viewer");
+    byId("cloudSaveBtn").disabled = !signedIn || cloud.saving || cloud.conflict || !isEditable();
+    const publishButton = byId("cloudPublishBtn");
+    const canPublish = signedIn && cloud.current?.access === "owner";
+    publishButton.classList.toggle("hidden", !canPublish);
+    publishButton.disabled = !canPublish || cloud.saving || cloud.current?.id === cloud.publicPlanId;
+    publishButton.textContent = cloud.current?.id === cloud.publicPlanId ? "通常URLで公開中" : "通常URLに公開";
     byId("cloudPlansBtn").disabled = !signedIn || cloud.saving;
     byId("cloudShareBtn").disabled = !signedIn || cloud.current?.access !== "owner" || cloud.saving;
-    byId("cloudReloadBtn").classList.toggle("hidden", !cloud.conflict);
+    const reloadButton = byId("cloudReloadBtn");
+    const publicView = cloud.current?.access === "public";
+    reloadButton.classList.toggle("hidden", !cloud.conflict && !publicView);
+    reloadButton.classList.toggle("btn-danger", cloud.conflict);
+    reloadButton.classList.toggle("btn-soft", !cloud.conflict);
+    reloadButton.textContent = publicView ? "最新版に更新" : "最新を再読込";
     byId("cloudSignedOut").classList.toggle("hidden", signedIn);
     byId("cloudSignedIn").classList.toggle("hidden", !signedIn);
     byId("cloudAccountEmail").textContent = cloud.session?.user?.email || "";
 
     const targetLoading = !!(getShareTokenFromUrl() || getOwnedPlanIdFromUrl()) && !cloud.current;
-    const readOnly = cloud.current?.access === "viewer";
+    const readOnly = cloud.current?.access === "viewer" || publicView;
     document.body.classList.toggle("cloud-readonly", !!readOnly);
     document.body.classList.toggle("cloud-target-loading", targetLoading);
     [
@@ -159,15 +170,6 @@
     }));
   }
 
-  function readPersistedCurrent() {
-    try {
-      const value = JSON.parse(localStorage.getItem(CURRENT_PLAN_KEY) || "null");
-      return value && value.id ? value : null;
-    } catch (_error) {
-      return null;
-    }
-  }
-
   function normalizePlan(row, access, shareToken) {
     return {
       id: row.id,
@@ -181,14 +183,16 @@
     };
   }
 
-  function applyCloudPlan(row, access, shareToken) {
+  function applyCloudPlan(row, access, shareToken, updateUrl = true) {
     cloud.suppressAutosave = true;
     if (window.applyCloudStatePayload) window.applyCloudStatePayload(row.payload);
     else applyStatePayload(row.payload);
     render();
     cloud.current = normalizePlan(row, access, shareToken);
-    if (access === "owner") setOwnedPlanParam(row.id);
-    else setSharedPlanParam(shareToken);
+    cloud.current.keepBaseUrl = access === "owner" && !updateUrl;
+    if (access === "owner" && updateUrl) setOwnedPlanParam(row.id);
+    else if (access === "viewer" || access === "editor") setSharedPlanParam(shareToken);
+    else if (access === "public") setSharedPlanParam("");
     cloud.lastSavedSignature = payloadSignature();
     cloud.conflict = false;
     persistCurrent();
@@ -334,7 +338,7 @@
     await listOwnedPlans();
   }
 
-  async function loadOwnedPlan(planId, closeList) {
+  async function loadOwnedPlan(planId, closeList, updateUrl = true) {
     setStatus("クラウドから読込中", "saving");
     const { data, error } = await cloud.client
       .from("seminar_plans")
@@ -345,9 +349,69 @@
       handleCloudError(error, "設計を読み込めません");
       return false;
     }
-    applyCloudPlan(data, "owner", "");
+    applyCloudPlan(data, "owner", "", updateUrl);
     if (closeList) closeCloudModal("cloudPlansModal");
     return true;
+  }
+
+  async function loadLatestOwnedPlan() {
+    setStatus("最新版を確認中", "saving");
+    const { data, error } = await cloud.client
+      .from("seminar_plans")
+      .select("id,title,payload,revision,view_token,edit_token,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    if (error) {
+      handleCloudError(error, "最新版を読み込めません");
+      return false;
+    }
+    const row = firstRow(data);
+    if (!row) {
+      setStatus("クラウド接続済み", "ok");
+      return true;
+    }
+    applyCloudPlan(row, "owner", "", false);
+    return true;
+  }
+
+  async function loadPublicPlan(applyPlan = true) {
+    if (applyPlan) setStatus("公開最新版を読込中", "saving");
+    const { data, error } = await cloud.client.rpc("load_public_seminar_plan");
+    const row = firstRow(data);
+    if (error || !row) {
+      if (applyPlan) {
+        handleCloudError(error || new Error("公開設計が設定されていません"), "公開最新版を読み込めません");
+      }
+      return false;
+    }
+    cloud.publicPlanId = row.id;
+    if (applyPlan) {
+      applyCloudPlan(row, "public", "", false);
+      setStatus(`公開最新版 ${formatUpdatedAt(row.updated_at)}`, "ok");
+    } else {
+      renderCloudUi();
+    }
+    return true;
+  }
+
+  async function publishCurrentPlan() {
+    if (!cloud.session || cloud.current?.access !== "owner") return;
+    if (!confirm(`「${cloud.current.title}」を通常URLで公開しますか？ログインしていない人も閲覧できるようになります。`)) return;
+    cloud.saving = true;
+    renderCloudUi();
+    setStatus("通常URLへ公開中", "saving");
+    const { data, error } = await cloud.client.rpc("publish_owned_seminar_plan", {
+      p_plan_id: cloud.current.id
+    });
+    const row = firstRow(data);
+    cloud.saving = false;
+    if (error || !row) {
+      handleCloudError(error || new Error("公開結果がありません"), "通常URLへ公開できません");
+      return;
+    }
+    cloud.publicPlanId = row.id;
+    setStatus(`通常URLで公開中 ${formatUpdatedAt(row.updated_at)}`, "ok");
+    renderCloudUi();
   }
 
   async function loadSharedPlan(token, closeList) {
@@ -454,6 +518,7 @@
   };
 
   async function refreshLatestWhenSafe() {
+    if (cloud.current?.access === "public") return false;
     if (
       !cloud.session ||
       !cloud.current ||
@@ -491,16 +556,22 @@
     const row = firstRow(data);
     if (!row || Number(row.revision) <= cloud.current.revision) return true;
 
-    applyCloudPlan(row, cloud.current.access, cloud.current.shareToken);
+    const updateUrl = !cloud.current.keepBaseUrl;
+    applyCloudPlan(row, cloud.current.access, cloud.current.shareToken, updateUrl);
     setStatus(`最新版を反映 ${formatUpdatedAt(row.updated_at)}`, "ok");
     return true;
   }
 
   async function reloadCurrentPlan() {
     if (!cloud.current) return;
-    const ok = cloud.current.access === "owner"
-      ? await loadOwnedPlan(cloud.current.id, false)
-      : await loadSharedPlan(cloud.current.shareToken, false);
+    let ok;
+    if (cloud.current.access === "public") {
+      ok = await loadPublicPlan(true);
+    } else if (cloud.current.access === "owner") {
+      ok = await loadOwnedPlan(cloud.current.id, false, !cloud.current.keepBaseUrl);
+    } else {
+      ok = await loadSharedPlan(cloud.current.shareToken, false);
+    }
     if (ok) cloud.conflict = false;
     renderCloudUi();
   }
@@ -552,6 +623,8 @@
       if (getShareTokenFromUrl() || getOwnedPlanIdFromUrl()) {
         setStatus("クラウド設計を開くにはログイン", "error");
         openCloudModal("cloudAuthModal");
+      } else {
+        await loadPublicPlan(true);
       }
       renderCloudUi();
       return;
@@ -559,6 +632,7 @@
 
     setStatus("クラウド接続済み", "ok");
     renderCloudUi();
+    if (!wasSignedIn) await loadPublicPlan(false);
     const urlToken = getShareTokenFromUrl();
     if (urlToken) {
       await loadSharedPlan(urlToken, false);
@@ -570,14 +644,7 @@
       return;
     }
 
-    if (!wasSignedIn) {
-      const persisted = readPersistedCurrent();
-      if (persisted?.access === "owner") {
-        await loadOwnedPlan(persisted.id, false);
-      } else if (persisted?.shareToken) {
-        await loadSharedPlan(persisted.shareToken, false);
-      }
-    }
+    if (!wasSignedIn) await loadLatestOwnedPlan();
   }
 
   function bindEvents() {
@@ -585,6 +652,7 @@
     byId("cloudSendLinkBtn").addEventListener("click", sendLoginLink);
     byId("cloudSignOutBtn").addEventListener("click", signOut);
     byId("cloudSaveBtn").addEventListener("click", () => saveCloudPlan({ manual: true }));
+    byId("cloudPublishBtn").addEventListener("click", publishCurrentPlan);
     byId("cloudPlansBtn").addEventListener("click", async () => {
       openCloudModal("cloudPlansModal");
       await listOwnedPlans();
@@ -648,8 +716,6 @@
     if (!cloud.session && (getShareTokenFromUrl() || getOwnedPlanIdFromUrl())) {
       setStatus("クラウド設計を開くにはログイン", "error");
       openCloudModal("cloudAuthModal");
-    } else if (!cloud.session) {
-      setStatus("未ログイン", "idle");
     }
     renderCloudUi();
   }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TKCシステムで会計を未来につなぐ ～365日変動損益計算書・継続MAS・AI活用と実践｜NMF第2分科会 135分内休憩10分設計ツール v5.12 Live</title>
+<title>TKCシステムで会計を未来につなぐ ～365日変動損益計算書・継続MAS・AI活用と実践｜NMF第2分科会 135分内休憩10分設計ツール v5.14 Live</title>
 <style>
   :root {
     --bg:#f4f7fb;
@@ -258,7 +258,7 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>TKCシステムで会計を未来につなぐ ～365日変動損益計算書・継続MAS・AI活用と実践｜NMF第2分科会 135分内休憩10分設計ツール v5.12 Live</h1>
+    <h1>TKCシステムで会計を未来につなぐ ～365日変動損益計算書・継続MAS・AI活用と実践｜NMF第2分科会 135分内休憩10分設計ツール v5.14 Live</h1>
     <p>ファシリテーター（天野先生）、講師2名（大森先生・松本）の対話型進行を、TKC方式の本筋から外さず、時間配分・候補スライド・ガントチャート・台本・準拠度まで一体で設計します。</p>
     <div class="toolbar">
       <button class="btn-hero" data-template="balanced">TKC本筋テンプレート</button>
@@ -282,9 +282,10 @@
     <div class="cloud-actions">
       <button class="btn-soft" id="cloudAccountBtn">ログイン</button>
       <button class="btn-primary" id="cloudSaveBtn" disabled>クラウド保存</button>
+      <button class="btn-soft hidden" id="cloudPublishBtn" disabled>通常URLに公開</button>
       <button class="btn-soft" id="cloudPlansBtn" disabled>設計一覧</button>
       <button class="btn-soft" id="cloudShareBtn" disabled>共有</button>
-      <button class="btn-danger hidden" id="cloudReloadBtn">最新を再読込</button>
+      <button class="btn-soft hidden" id="cloudReloadBtn">最新版に更新</button>
     </div>
   </section>
 
@@ -299,6 +300,7 @@
           <button class="btn-primary" id="renderScriptBtn">台本を更新</button>
           <button class="btn-soft" id="copyScriptBtn">台本コピー</button>
           <button class="btn-soft" id="downloadScriptBtn">TXT保存</button>
+          <button class="btn-soft" id="downloadExcelBtn">Excel保存</button>
         </div>
       </div>
 
@@ -488,6 +490,7 @@
   </div>
 </div>
 
+<script src="./vendor/xlsx.full.min.js?v=0.18.5"></script>
 <script>
 const SESSION_TARGET = 135;
 const BREAK_TARGET = 10;
@@ -944,6 +947,71 @@ function buildScriptText(){
   }).join('\n\n'+'='.repeat(48)+'\n\n');
 }
 
+function buildScriptWorkbookRows(){
+  return [
+    ['パート（タイトル・時間）','天野先生','大森先生','松本'],
+    ...state.segments.map((s,i)=>{
+      const part=`${i+1}. ${s.title}\n${s.start}〜${s.start+Number(s.duration)}分（${s.duration}分）`;
+      if(isBreak(s)) return [part,s.goal||'休憩','', ''];
+      return [part,s.prompt||'',s.speakerB||'',s.speakerA||''];
+    })
+  ];
+}
+
+function finalizeScriptWorkbook(workbookData){
+  const archive=XLSX.CFB.read(new Uint8Array(workbookData),{type:'buffer'});
+  const sheetFile=XLSX.CFB.find(archive,'Root Entry/xl/worksheets/sheet1.xml');
+  const stylesFile=XLSX.CFB.find(archive,'Root Entry/xl/styles.xml');
+  if(!sheetFile || !stylesFile) return workbookData;
+
+  const decoder=new TextDecoder('utf-8');
+  const encoder=new TextEncoder();
+  let sheetXml=decoder.decode(sheetFile.content);
+  let stylesXml=decoder.decode(stylesFile.content);
+  sheetXml=sheetXml.replace(/(<worksheet[^>]*>)/,match=>`${match}<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>`);
+  sheetXml=sheetXml.replace(/<c (?![^>]*\bs=)/g,'<c s="1" ');
+  const printSettings='<printOptions horizontalCentered="1"/><pageMargins left="0.3" right="0.3" top="0.45" bottom="0.45" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+  sheetXml=sheetXml.includes('<ignoredErrors>')
+    ? sheetXml.replace('<ignoredErrors>',`${printSettings}<ignoredErrors>`)
+    : sheetXml.replace('</worksheet>',`${printSettings}</worksheet>`);
+  stylesXml=stylesXml.replace(
+    /<cellXfs count="1">([\s\S]*?)<\/cellXfs>/,
+    '<cellXfs count="2">$1<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs>'
+  );
+
+  sheetFile.content=encoder.encode(sheetXml);
+  sheetFile.size=sheetFile.content.length;
+  stylesFile.content=encoder.encode(stylesXml);
+  stylesFile.size=stylesFile.content.length;
+  return XLSX.CFB.write(archive,{type:'array',fileType:'zip',compression:true});
+}
+
+function downloadScriptExcel(){
+  if(!window.XLSX){
+    alert('Excel出力機能を読み込めませんでした。通信状態を確認して、もう一度お試しください。');
+    return;
+  }
+  const rows=buildScriptWorkbookRows();
+  const sheet=XLSX.utils.aoa_to_sheet(rows);
+  sheet['!cols']=[{wch:38},{wch:48},{wch:48},{wch:48}];
+  sheet['!rows']=[{hpt:28},...rows.slice(1).map(row=>({
+    hpt:Math.max(54,Math.min(150,30+Math.max(...row.map(value=>String(value||'').length))*0.72))
+  }))];
+  sheet['!autofilter']={ref:`A1:D${rows.length}`};
+  sheet['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0};
+  sheet['!margins']={left:0.3,right:0.3,top:0.45,bottom:0.45,header:0.2,footer:0.2};
+  const workbook=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook,sheet,'進行台本');
+  workbook.Props={Title:'NMF第2分科会 進行台本',Subject:'話者別進行台本'};
+  const workbookData=XLSX.write(workbook,{bookType:'xlsx',type:'array',compression:true});
+  const blob=new Blob([finalizeScriptWorkbook(workbookData)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download='NMF第2分科会_進行台本.xlsx';
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 function renderScript(){ document.getElementById('scriptOutput').textContent=buildScriptText(); }
 
 function renderChecks(){
@@ -1038,7 +1106,7 @@ function addSegment(){
 
 function exportJson(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v512_live.json'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nmf_session_plan_v514_live.json'; a.click(); URL.revokeObjectURL(a.href);
 }
 function importJson(file){
   const r=new FileReader();
@@ -1122,6 +1190,8 @@ let editDraft=null;
 let editDraftIndex=-1;
 let editDraftIsNew=false;
 let editDraftDeleted=false;
+let editDraftOriginal=null;
+let editDraftOriginalIndex=-1;
 function syncModalLock(){
   document.body.classList.toggle('modal-open',!!document.querySelector('.modal.open'));
 }
@@ -1133,6 +1203,8 @@ function beginEditDraft(source,index,trigger,isNew=false){
   editDraftIndex=index;
   editDraftIsNew=isNew;
   editDraftDeleted=false;
+  editDraftOriginal=isNew ? null : cloneEditSegment(source);
+  editDraftOriginalIndex=index;
   editReturnTarget=trigger?.id ? `#${trigger.id}` : `[data-select="${source.id}"]`;
   renderEditor();
   const modal=document.getElementById('editModal');
@@ -1151,6 +1223,13 @@ function clearEditDraft(){
   editDraftIndex=-1;
   editDraftIsNew=false;
   editDraftDeleted=false;
+  editDraftOriginal=null;
+  editDraftOriginalIndex=-1;
+}
+function hasEditDraftChanges(){
+  if(!editDraft) return false;
+  if(editDraftIsNew || editDraftDeleted || editDraftIndex!==editDraftOriginalIndex) return true;
+  return JSON.stringify(editDraft)!==JSON.stringify(editDraftOriginal);
 }
 function commitEditModal(){
   if(!editDraft){ closeEditModal(); return; }
@@ -1181,6 +1260,7 @@ function commitEditModal(){
   render();
 }
 function closeEditModal(restoreFocus=true,discard=true){
+  if(discard && hasEditDraftChanges() && !confirm('入力中の変更を破棄しますか？この操作は元に戻せません。')) return false;
   const modal=document.getElementById('editModal');
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden','true');
@@ -1188,6 +1268,7 @@ function closeEditModal(restoreFocus=true,discard=true){
   if(restoreFocus && editReturnTarget) document.querySelector(editReturnTarget)?.focus();
   editReturnTarget='';
   if(discard) clearEditDraft();
+  return true;
 }
 window.hasPendingCardEdit=()=>!!editDraft;
 
@@ -1234,6 +1315,7 @@ document.getElementById('delBtn').onclick=deleteSelected;
 document.getElementById('renderScriptBtn').onclick=renderScript;
 document.getElementById('copyScriptBtn').onclick=()=>copyText(buildScriptText());
 document.getElementById('downloadScriptBtn').onclick=downloadText;
+document.getElementById('downloadExcelBtn').onclick=downloadScriptExcel;
 document.getElementById('copyGanttBtn').onclick=copyGantt;
 
 [
@@ -1248,8 +1330,8 @@ if((!initialCloudTarget&&loadShareFromUrl()) || loadSavedState()) render();
 else setTemplate('balanced');
 saveState();
 </script>
-<script src="./supabase-config.js?v=5.12.0"></script>
+<script src="./supabase-config.js?v=5.14.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./cloud.js?v=5.12.0"></script>
+<script src="./cloud.js?v=5.14.0"></script>
 </body>
 </html>

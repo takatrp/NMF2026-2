@@ -35,6 +35,24 @@ create unique index if not exists seminar_plans_edit_token_uidx
 create index if not exists seminar_plans_owner_updated_idx
   on public.seminar_plans (owner_id, updated_at desc);
 
+create table if not exists public.seminar_publications (
+  slug text primary key,
+  plan_id uuid not null
+    references public.seminar_plans(id) on delete cascade,
+  published_at timestamptz not null default pg_catalog.now(),
+  constraint seminar_publications_default_slug_check
+    check (slug = 'default')
+);
+
+insert into public.seminar_publications (slug, plan_id)
+select
+  'default',
+  plan_row.id
+from public.seminar_plans as plan_row
+order by plan_row.updated_at desc
+limit 1
+on conflict (slug) do nothing;
+
 create table if not exists public.seminar_plan_history (
   id bigint generated always as identity primary key,
   plan_id uuid not null
@@ -61,6 +79,7 @@ create index if not exists seminar_plan_history_owner_saved_idx
   on public.seminar_plan_history (owner_id, saved_at desc);
 
 alter table public.seminar_plans enable row level security;
+alter table public.seminar_publications enable row level security;
 alter table public.seminar_plan_history enable row level security;
 
 drop policy if exists seminar_plans_owner_select
@@ -91,6 +110,8 @@ create policy seminar_plan_history_owner_select
 -- Inserts and updates are intentionally limited to the RPCs below so every
 -- write performs authorization, optimistic locking, and history recording.
 revoke all privileges on table public.seminar_plans
+  from public, anon, authenticated;
+revoke all privileges on table public.seminar_publications
   from public, anon, authenticated;
 revoke all privileges on table public.seminar_plan_history
   from public, anon, authenticated;
@@ -526,6 +547,106 @@ begin
 end;
 $function$;
 
+create or replace function public.load_public_seminar_plan()
+returns table (
+  id uuid,
+  title text,
+  payload jsonb,
+  revision bigint,
+  updated_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = pg_catalog
+as $function$
+  select
+    plan_row.id,
+    plan_row.title,
+    plan_row.payload,
+    plan_row.revision,
+    plan_row.updated_at
+  from public.seminar_publications as publication
+  join public.seminar_plans as plan_row
+    on plan_row.id = publication.plan_id
+  where publication.slug = 'default'
+  limit 1;
+$function$;
+
+create or replace function public.publish_owned_seminar_plan(
+  p_plan_id uuid
+)
+returns table (
+  id uuid,
+  title text,
+  payload jsonb,
+  revision bigint,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $function$
+declare
+  v_actor uuid := auth.uid();
+  v_public_owner uuid;
+begin
+  if v_actor is null then
+    raise exception using
+      errcode = '42501',
+      message = 'AUTHENTICATION_REQUIRED';
+  end if;
+
+  select plan_row.owner_id
+    into v_public_owner
+    from public.seminar_publications as publication
+    join public.seminar_plans as plan_row
+      on plan_row.id = publication.plan_id
+   where publication.slug = 'default';
+
+  if found and v_public_owner <> v_actor then
+    raise exception using
+      errcode = '42501',
+      message = 'PUBLICATION_OWNER_MISMATCH';
+  end if;
+
+  perform 1
+    from public.seminar_plans as plan_row
+   where plan_row.id = p_plan_id
+     and plan_row.owner_id = v_actor;
+
+  if not found then
+    raise exception using
+      errcode = 'P0002',
+      message = 'PLAN_NOT_FOUND_OR_NOT_OWNED';
+  end if;
+
+  insert into public.seminar_publications as publication (
+    slug,
+    plan_id,
+    published_at
+  )
+  values (
+    'default',
+    p_plan_id,
+    pg_catalog.now()
+  )
+  on conflict (slug) do update
+     set plan_id = excluded.plan_id,
+         published_at = excluded.published_at;
+
+  return query
+  select
+    plan_row.id,
+    plan_row.title,
+    plan_row.payload,
+    plan_row.revision,
+    plan_row.updated_at
+  from public.seminar_plans as plan_row
+  where plan_row.id = p_plan_id;
+end;
+$function$;
+
 revoke all privileges
   on function public.save_owned_seminar_plan(uuid, text, jsonb, bigint)
   from public, anon, authenticated;
@@ -537,6 +658,12 @@ revoke all privileges
   from public, anon, authenticated;
 revoke all privileges
   on function public.rotate_seminar_plan_share_tokens(uuid)
+  from public, anon, authenticated;
+revoke all privileges
+  on function public.load_public_seminar_plan()
+  from public, anon, authenticated;
+revoke all privileges
+  on function public.publish_owned_seminar_plan(uuid)
   from public, anon, authenticated;
 
 grant execute
@@ -550,10 +677,18 @@ grant execute
   to authenticated;
 grant execute
   on function public.rotate_seminar_plan_share_tokens(uuid)
+  to authenticated;
+grant execute
+  on function public.load_public_seminar_plan()
+  to anon, authenticated;
+grant execute
+  on function public.publish_owned_seminar_plan(uuid)
   to authenticated;
 
 comment on table public.seminar_plans is
   'NMF2026-2 seminar plans. Owner access uses RLS; shared access uses authenticated RPCs.';
+comment on table public.seminar_publications is
+  'Single public plan shown at the normal GitHub Pages URL.';
 comment on table public.seminar_plan_history is
   'Immutable content snapshots. Share tokens are deliberately excluded.';
 comment on function public.save_owned_seminar_plan(uuid, text, jsonb, bigint) is
@@ -564,5 +699,9 @@ comment on function public.save_shared_seminar_plan(uuid, text, jsonb, bigint) i
   'Optimistically updates a seminar plan using its edit token without returning tokens.';
 comment on function public.rotate_seminar_plan_share_tokens(uuid) is
   'Owner-only rotation of both share tokens; all prior share links become invalid.';
+comment on function public.load_public_seminar_plan() is
+  'Loads the designated public plan without exposing its owner or share tokens.';
+comment on function public.publish_owned_seminar_plan(uuid) is
+  'Lets the publication owner choose which owned plan is shown at the normal URL.';
 
 commit;

@@ -31,7 +31,7 @@ if (missingIds.length) {
   throw new Error(`cloud.js references missing ids: ${missingIds.join(", ")}`);
 }
 
-if (!html.includes("v5.12 Live")) throw new Error("Visible version is not v5.12 Live");
+if (!html.includes("v5.14 Live")) throw new Error("Visible version is not v5.14 Live");
 if (!config.includes("sb_publishable_")) throw new Error("Publishable key is not configured");
 if (/service_role|sb_secret_/i.test(config)) throw new Error("Secret Supabase key found in browser config");
 
